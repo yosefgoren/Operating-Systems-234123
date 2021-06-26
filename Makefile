@@ -1,22 +1,14 @@
 CPPC=g++
 COMP_FLAGS= -Wall -Wextra -Werror
-SOL=utils.cpp utils.h malloc_1.cpp malloc_1.h
+SUBMIT=malloc_1.cpp malloc_2.cpp malloc_3.cpp malloc_4.cpp submmitters.txt
 
-main.out: main.o utils.o utils.h malloc_1.o malloc_1.h malloc_2.o malloc_2.h
-	$(CPPC) $(COMP_FLAGS) $^ -o  $@
+all: test_1.out test_2.out
 
-main.o: main.cpp
-	$(CPPC) $^ -c -o $@
+test_1.out: test_1.cpp malloc_1.cpp malloc_1.h
+	$(CPPC) $(COMP_FLAGS) test_1.cpp malloc_1.cpp -o $@
 
-utils.o: utils.cpp utils.h
-	$(CPPC) $(COMP_FLAGS) utils.cpp -c -o $@
-
-malloc_1.o: malloc_1.cpp malloc_1.h
-	$(CPPC) $(COMP_FLAGS) malloc_1.cpp -c -o $@
-
-malloc_2.o: malloc_2.cpp malloc_2.h
-	$(CPPC) $(COMP_FLAGS) malloc_2.cpp -c -o $@
+test_2.out: test_2.cpp malloc_2.cpp malloc_2.h
+	$(CPPC) $(COMP_FLAGS) test_2.cpp malloc_2.cpp -o $@
 
 clean:
 	rm -rf *.o *.out
-
