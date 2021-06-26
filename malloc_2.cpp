@@ -9,7 +9,7 @@ struct Block{
     bool is_free;
     Block* next;
     Block* prev;
-
+    
     size_t getFullSize() const{
         void* first_byte_outside_udata = (next == NULL
             ? sbrk(0) : (void*)next);
@@ -21,14 +21,14 @@ struct Block{
     void* getStartOfUdata() const{
         return (void*)this + meta_data_size;
     }
-    void setFreeAndRemoveFromList(){
-        is_free = true;
-        if(next != NULL)
-            next->prev = prev;
-        if(prev != NULL)
-            prev->next = next;
-        next = prev = NULL;
-    }
+    // void setFreeAndRemoveFromList(){
+    //     is_free = true;
+    //     if(next != NULL)
+    //         next->prev = prev;
+    //     if(prev != NULL)
+    //         prev->next = next;
+    //     next = prev = NULL;
+    // }
 
     /**
      * returns a pointer to the block s.t. 'udata_ptr' points to the udata of that block.
