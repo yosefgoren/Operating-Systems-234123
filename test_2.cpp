@@ -20,6 +20,7 @@ int main(){
 	intest_counter = 0;
 	current_test_name = "test_malloc_2";
 
+
 	cout << current_test_name << ": " << (passed_all ? "PASSED" : "FAILED") << endl;
 	return 0;
 }
