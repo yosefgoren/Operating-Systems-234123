@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <cstring>
 
 using namespace std;
 
@@ -8,7 +9,7 @@ struct Block{
     bool is_free;
     Block* next;
     Block* prev;
-    
+
     size_t getFullSize() const{
         void* first_byte_outside_udata = (next == NULL
             ? sbrk(0) : (void*)next);
@@ -84,16 +85,18 @@ static Block* allocateNewBlock(size_t size){
  *      and ending with 'start_addr+num_bytes-1' (including the last one).
  */
 static void zeroOutBytes(void* start_addr, size_t num_bytes){
-    for(size_t i = 0; i < num_bytes; ++i)
-        *((char*)start_addr+i) = 0;
+    // for(size_t i = 0; i < num_bytes; ++i)
+    //     *((char*)start_addr+i) = 0;
+    memset(start_addr, 0, num_bytes);
 }
 
 /**
  * copies 'num_bytes' bytes from 'src' to 'dst'.
  */
 static void copyBytes(void* src, void* dst, size_t num_bytes){
-    for(size_t i = 0; i < num_bytes; ++i)
-        *((char*)dst+i) = *((char*)src+i);
+    memcpy(dst, src, num_bytes);
+    // for(size_t i = 0; i < num_bytes; ++i)
+    //     *((char*)dst+i) = *((char*)src+i);
 }
 
 /*
