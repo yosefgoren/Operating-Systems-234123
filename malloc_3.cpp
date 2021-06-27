@@ -1,23 +1,22 @@
 #include <unistd.h>
 
-struct Bin;
-struct Block;
-/**
- * assumes the parameter block has the correct value for the field 'udata_size'.
- * puts the block in the appropriate bin for it's actual size, and in the correct position within that bin.
- * will work if the block is in no bin or position {next, prev, containing_bin} are null.
- * does nothing if the block is already in the correct place.
- */
-static void correctPositionInBinTable(Block* block){
-    //TODO:
-}
+class Bin;
+class Block;
 
-struct Block{
+static bool isInCorrectBinTablePosition(Block* block);
+static void correctPositionInBinTable(Block* block);
+
+class Block{
+public:
     static const unsigned int min_udata_size_for_split = 128;
 
     bool is_free;
     Block* next;
+    //the next block should be bigger or equeals in size.
+    
     Block* prev;
+    //the previous block should be smaller or equals in size.
+    
     size_t udata_size;
     Bin* containing_bin;
 
@@ -59,6 +58,80 @@ struct Block{
     }
 
     /**
+     * returns wether the bin should be in the bin it is currently in, according to it's size.
+     * returns false if containing_bin is null. (it is in no bin, so definitely not the correct one)
+     */
+    bool isInCorrectBin() const{
+        if(containing_bin == nullptr)
+            return false;
+        
+        return this->containing_bin->inBinSizeRange(this->getTotalSize()); 
+    }
+
+    /**
+     * completely swaps the positons of the two blocks with eachother in terms of:
+     *      1. the blocks around 'this' and 'other'
+     *      2. the internal pointers within 'this' and 'other'
+     *      3. the bins that contain 'this' and 'other'
+     *  if 'other' is null, does nothing.
+     */
+    void swapPositionWithBlock(Block* other){
+        
+    }
+
+    /**
+     * changes the position of this Block within it's containing bin, untils the position satisfies:
+     *      1. if there is a next block, this block is smaller than the next.
+     *      2. if there is a previous block, this block is bigger than the prev.
+     * if this block is already in the correct position - does nothing.
+     * if this block is not in the correct bin, the behavior is undefiend.
+     */
+    void siftToCorrectPositionWithinBin(){
+        while(true){
+            if(next != nullptr && next->getTotalSize() < getTotalSize()))
+                swapPositionWithBlock(next);
+            else if(prev != nullptr && prev->getTotalSize() > getTotalSize())
+                swapPositionWithBlock(next);
+            else
+                break;
+        }
+    }
+
+    /**
+     * changes containing_bin to null, and correct the fields of the blocks and prior bin
+     * so that they do not point at 'this' anymore (and maybe point at something else as needed). 
+     */
+    void removeFromContainingBin(){
+
+    }
+
+    /**
+     * assumes the parameter block has the correct value for the field 'udata_size'.
+     * puts the block in the appropriate bin for it's actual size, and in the correct position within that bin.
+     * will work if the block is in no bin or position {next, prev, containing_bin} are null.
+     * does nothing if the block is already in the correct place.
+     */
+    void correctPositionInBinTable(){
+        if(!isInCorrectBin()){
+            removeFromContainingBin();
+            
+            Bin* correct_bin = Bin::getProperBinForSize(this->getTotalSize());
+            //insert the block to the bin as the 'new smallest'
+            // - with possibly incorrect position because it might now be the smallest:
+            if(correct_bin->smallest != nullptr){
+                Block* old_smallest = correct_bin->smallest;
+                old_smallest->prev = this;
+                this->next = old_smallest;
+            } else 
+                correct_bin->biggest = this;
+            correct_bin->smallest = this;
+        }
+        
+        siftToCorrectPositionWithinBin();
+        //this part should work whether or not the block was inserted to a new bin.
+    }
+
+    /**
      * returns a pointer to the block s.t. 'udata_ptr' points to the udata of that block.
      */
     static Block* getBlockFromAllocatedUdata(void* udata_ptr){
@@ -72,23 +145,30 @@ typedef unsigned int index_t;
  * a double-linked-list of Blocks. each block must maintain that
  *      the total size of the block is within: '[KB_bytes*bin_index, KB_bytes*(bin_index+1))'.
  */
-struct Bin{
+class Bin{
+public:
     static const unsigned int KB_bytes = 1024;
 
     const index_t bin_index;
     Block* biggest;
     Block* smallest;
-    Bin(index_t bin_index):bin_index(bin_index), biggest(nullptr), smallest(nullptr){}
-    
+
     /**
-     * returns the index of the bin that should hold a block with 
-     *      TOTAL size that equals to the 'size' parameter.
-     * the 'index' of the bin should be s.t. 'total_size' is in '[KB_bytes*index, KB_bytes*(index+1))'. 
+     * remembers the number of bins that where initialized thus far,
+     * returns that number and than increments it when called.
      */
-    static index_t getBinIndexForSize(size_t total_size){
-        if(total_size/KB_bytes != (total_size-1)/KB_bytes)
-            return total_size/KB_bytes+1;
-        return total_size/KB_bytes;
+    static index_t binsCounter(){
+        static index_t counter = 0;
+        return counter++;
+    }
+
+    Bin():bin_index(binsCounter()), biggest(nullptr), smallest(nullptr){}
+
+    /**
+     * returns the bin that a block thould be it given it's total size.
+     */
+    static Bin* getProperBinForSize(size_t total_size){
+        return getBinTable()[getBinIndexForSize(total_size)];
     }
 
     /**
@@ -125,15 +205,31 @@ struct Bin{
         }
         return nullptr;
     }
+    
+    /**
+     * returns the index of the bin that should hold a block with 
+     *      TOTAL size that equals to the 'size' parameter.
+     * the 'index' of the bin should be s.t. 'total_size' is in '[KB_bytes*index, KB_bytes*(index+1))'. 
+     */
+    static index_t getBinIndexForSize(size_t total_size){
+        if(total_size/KB_bytes != (total_size-1)/KB_bytes)
+            return total_size/KB_bytes+1;
+        return total_size/KB_bytes;
+    }
 };
 
-static const unsigned int num_bins = 128;
-static Bin bin_table[num_bins];
-static bool bins_initialized = false;
-
-//TODO:
-static void initializeBinsIfNeeded(){
+/**
+ * the allocation system has a single bin table that is infact an array of bins,
+ *      this data structure allows access to every block allocated by the system.
+ *      this data structure is a singleton, and this function is the only way to access this singleton.
+ * the function will initialize the bin table the first time it is called, and from there on simple return it.
+ */
+static Bin* getBinTable(){
+    static const unsigned int num_bins = 128;
+    //this part should call the default constructor num_bins times.
+    static Bin bin_table[num_bins];
     
+    return bin_table;
 }
 
 /*

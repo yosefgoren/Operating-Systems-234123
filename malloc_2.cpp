@@ -3,8 +3,8 @@
 
 using namespace std;
 
+static const size_t meta_data_size = sizeof(Block);
 struct Block{
-    static const size_t meta_data_size = sizeof(bool)+sizeof(Block*)+sizeof(Block*);
     
     bool is_free;
     Block* next;
@@ -64,7 +64,7 @@ static Block* findBlockOfSize(size_t size){
  *      inserts it as the last item in the block list, and returns a pointer to it.
  */
 static Block* allocateNewBlock(size_t size){
-    Block* new_block = (Block*)sbrk(Block::meta_data_size+size);
+    Block* new_block = (Block*)sbrk(meta_data_size+size);
     if(new_block == NULL)
         return NULL;
 
@@ -162,7 +162,7 @@ void sfree(void* p){
 }
 
 /**
- * @brief f ‘size’ is smaller than the current block’s size, reuses the same block. Otherwise,
+ * @brief if ‘size’ is smaller than the current block’s size, reuses the same block. Otherwise,
  *      finds/allocates ‘size’ bytes for a new space, copies content of oldp into the new
  *      allocated space and frees the oldp.
  * 'oldp' is not freed if srealloc fails.
@@ -251,13 +251,13 @@ size_t _num_allocated_bytes(){
  * Returns the overall number of meta-data bytes currently in the heap.
  */
 size_t _num_meta_data_bytes(){
-    return _num_allocated_blocks()*Block::meta_data_size;
+    return _num_allocated_blocks()*meta_data_size;
 }
 /**
  * Returns the number of bytes of a single meta-data structure in your system.
  */
 size_t _size_meta_data(){
-    return Block::meta_data_size;
+    return meta_data_size;
 }
 
 
