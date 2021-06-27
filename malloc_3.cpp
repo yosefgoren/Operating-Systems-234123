@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <sys/mman.h>
 
 class Bin;
 class Block;
@@ -75,8 +76,24 @@ public:
      *      3. the bins that contain 'this' and 'other'
      *  if 'other' is null, does nothing.
      */
-    void swapPositionWithBlock(Block* other){
+    // void swapPositionWithBlock(Block* other){
         
+    // }
+
+    /**
+     * swaps 'this' with the next block, correcting for pointers of both blocks,
+     *  the blocks around them and the pointers in the bin that contains them.
+     */
+    void siftWithNext(){
+
+    }
+    
+    /**
+     * swaps 'this' with the prev block, correcting for pointers of both blocks,
+     *  the blocks around them and the pointers in the bin that contains them.
+     */
+    void siftWithNext(){
+
     }
 
     /**
@@ -102,7 +119,24 @@ public:
      * so that they do not point at 'this' anymore (and maybe point at something else as needed). 
      */
     void removeFromContainingBin(){
+        Bin* bin = this->containing_bin;
+        if(bin == nullptr)
+            return;//a block with no bin thould have no blocks connected to it.
+        
+        if(bin->biggest == this)
+            bin->biggest = this->prev;
+        if(bin->smallest == this)
+            bin->smallest = this->next;
+        this->containing_bin = nullptr;
 
+        if(this->next != nullptr){
+            this->next->prev = this->prev;
+            this->next = nullptr;
+        }
+        if(this->prev != nullptr){
+            this->prev->next = this->next;
+            this->prev = nullptr;
+        }
     }
 
     /**
@@ -216,6 +250,17 @@ public:
             return total_size/KB_bytes+1;
         return total_size/KB_bytes;
     }
+
+    /**
+     * tries to allocate new space for a block with TOTAL 'total_size' by calling 'sbrk()',
+     *      if fails, reuturns NULL, otherwise - initializes a new block in the allocated space,
+     *      inserts it as the last item in the block list, and returns a pointer to it.
+     */
+    Block* allocateNewBlock(size_t total_size){
+        Block* new_block; 
+        //in the the case that the new block is too big for the regular bins:
+        //new_block = (Block*)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, -1, 0);
+    }  
 };
 
 /**
@@ -243,7 +288,21 @@ static Bin* getBinTable(){
  *      failure - returns null in the following cases: 'size' is 0 or more than 100000000, 'sbrk()' fails.
  */
 void* smalloc(size_t size){
-
+    if(size == 0 || size > 100000000)
+        return nullptr;
+    size_t min_block_total_size = size+sizeof(Block);
+    Bin* bin = Bin::getProperBinForSize(min_block_total_size);
+    
+    Block* housing_block = bin->findSmallestBlockThatFits(min_block_total_size);
+    if(housing_block != nullptr){
+        housing_block->splitAndCorrectIfPossible(min_block_total_size);
+        return housing_block->getStartOfUdata();
+    }
+    
+    housing_block bin->allocateNewBlock(min_block_total_size);
+    if(housing_block == nullptr)
+        return nullptr;
+    return housing_block->getStartOfUdata();
 }
 
 /**
