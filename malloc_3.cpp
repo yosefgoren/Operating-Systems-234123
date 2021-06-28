@@ -52,8 +52,8 @@ public:
             this->udata_size = first_block_total_size; 
             
             //make sure all of the blocks are in the correct positions:
-            correctPositionInBinTable(this);
-            correctPositionInBinTable(new_block);
+            this->correctPositionInBinTable();
+            new_block->correctPositionInBinTable();
         } else
             return nullptr;
     }
@@ -85,15 +85,53 @@ public:
      *  the blocks around them and the pointers in the bin that contains them.
      */
     void siftWithNext(){
+        //fix pointers of srounding blocks:
+        if(next->next != nullptr)
+            next->next->prev = this;
+        if(prev != nullptr)
+            prev->next = next;
 
+        //fix pointers of containing bin:
+        if(next == containing_bin->biggest)
+            containing_bin->biggest = this;
+        if(this == containing_bin->smallest)
+            containing_bin->smallest = next;
+
+        //fix the pointers of this and this->next:
+        Block* old_next = next;
+        Block* new_next = old_next->next;
+        Block* old_prev = prev;
+        next = new_next;
+        prev = old_next;
+        old_next->next = this;
+        old_next->prev = old_prev;
     }
     
     /**
      * swaps 'this' with the prev block, correcting for pointers of both blocks,
      *  the blocks around them and the pointers in the bin that contains them.
      */
-    void siftWithNext(){
+    void siftWithPrev(){
+        //fix pointers of srounding blocks:
+        if(prev->prev != nullptr)
+            prev->prev->next = this;
+        if(next != nullptr)
+            next->prev = prev;
 
+        //fix pointers of containing bin:
+        if(prev == containing_bin->smallest)
+            containing_bin->smallest = this;
+        if(this == containing_bin->biggest)
+            containing_bin->biggest = prev;
+
+        //fix the pointer of this and this->prev:
+        Block* old_prev = prev;
+        Block* new_prev = old_prev->prev;
+        Block* old_next = next;
+        prev = old_prev->prev;
+        next = old_prev;
+        old_prev->prev = this;
+        old_prev->next = old_next;
     }
 
     /**
@@ -106,9 +144,9 @@ public:
     void siftToCorrectPositionWithinBin(){
         while(true){
             if(next != nullptr && next->getTotalSize() < getTotalSize()))
-                swapPositionWithBlock(next);
+                siftWithNext();
             else if(prev != nullptr && prev->getTotalSize() > getTotalSize())
-                swapPositionWithBlock(next);
+                siftWithPrev();
             else
                 break;
         }
@@ -202,7 +240,7 @@ public:
      * returns the bin that a block thould be it given it's total size.
      */
     static Bin* getProperBinForSize(size_t total_size){
-        return getBinTable()[getBinIndexForSize(total_size)];
+        return getBinTable()+getBinIndexForSize(total_size);
     }
 
     /**
@@ -299,7 +337,7 @@ void* smalloc(size_t size){
         return housing_block->getStartOfUdata();
     }
     
-    housing_block bin->allocateNewBlock(min_block_total_size);
+    housing_block = bin->allocateNewBlock(min_block_total_size);
     if(housing_block == nullptr)
         return nullptr;
     return housing_block->getStartOfUdata();
