@@ -85,8 +85,6 @@ static Block* allocateNewBlock(size_t size){
  *      and ending with 'start_addr+num_bytes-1' (including the last one).
  */
 static void zeroOutBytes(void* start_addr, size_t num_bytes){
-    // for(size_t i = 0; i < num_bytes; ++i)
-    //     *((char*)start_addr+i) = 0;
     memset(start_addr, 0, num_bytes);
 }
 
@@ -95,8 +93,6 @@ static void zeroOutBytes(void* start_addr, size_t num_bytes){
  */
 static void copyBytes(void* src, void* dst, size_t num_bytes){
     memcpy(dst, src, num_bytes);
-    // for(size_t i = 0; i < num_bytes; ++i)
-    //     *((char*)dst+i) = *((char*)src+i);
 }
 
 /*

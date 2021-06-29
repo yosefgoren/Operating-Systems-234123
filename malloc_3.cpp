@@ -3,6 +3,14 @@
 
 class Bin;
 class Block;
+typedef unsigned int index_t;
+
+static const size_t MAX_BLOCK_SIZE = 100000000;
+static const unsigned int NUM_BINS = 129;
+static const index_t BIG_BOI_BIN_INDEX = NUM_BINS-1;
+static const index_t NO_LEGAL_INDEX = NUM_BINS;
+
+static Block* last_sbrk_block = nullptr;
 
 static bool isInCorrectBinTablePosition(Block* block);
 static void correctPositionInBinTable(Block* block);
@@ -13,16 +21,19 @@ public:
 
     bool is_free;
     Block* next;
-    //the next block should be bigger or equeals in size.
+    //the next block should be bigger or equeals in size (next in the bin this block is in).
     
     Block* prev;
-    //the previous block should be smaller or equals in size.
+    //the previous block should be smaller or equals in size (prev in the bin this block is in).
     
     size_t udata_size;
     Bin* containing_bin;
+    Block* before_in_memory;
+    //the block with the largest adress that is smaller than 'this', null if one does not exit.
 
-    Block(bool is_free, Block* next, Block* prev, size_t udata_size, Bin* containing_bin)
-        :is_free(is_free), next(next), prev(prev), udata_size(udata_size), containing_bin(containing_bin){}
+    Block(bool is_free, Block* next, Block* prev, size_t udata_size, Bin* containing_bin, Block* before_in_memory)
+        :is_free(is_free), next(next), prev(prev), udata_size(udata_size), 
+            containing_bin(containing_bin), before_in_memory(before_in_memory){}
 
     /**
      * returns the total size of the block, including both the meta data and udata (user-data).
@@ -37,7 +48,7 @@ public:
      * if the total size is sufficiant to house both a block of size 'first_block_total_size',
      *  and another block with udata size of atleast 'min_udata_size_for_split'
      *       - then the method will make the split: fixing the size of 'this' to be the parameter,
-     *       initialzing the new block, make sure both blocks are in the correct position in the correct bin,
+     *       initialzing the new block, making sure that both blocks are in the correct position in the correct bin,
      *       and return a pointer to the new block.
      *  if a split cannot be made - does nothing to the block and returns null.
      */
@@ -47,7 +58,7 @@ public:
             //find the position of the new block and initialize it's value:
             Block* new_block = (Block*)((void*)this + sizeof(Block) + first_block_total_size);
             size_t new_block_udata_size = this->getTotalSize()-sizeof(Block)*2-first_block_total_size;
-            *new_block = Block(true, nullptr, nullptr, new_block_udata_size, nullptr);
+            *new_block = Block(true, nullptr, nullptr, new_block_udata_size, nullptr, this);
             //update the size of the existing block:
             this->udata_size = first_block_total_size; 
             
@@ -56,6 +67,50 @@ public:
             new_block->correctPositionInBinTable();
         } else
             return nullptr;
+    }
+private:
+    /**
+     * returns the block that is right after 'this' in memory,
+     * if one does not exist or if 'this' is the the mmap'ed bin, returns null.
+     */
+    Block* getAfterInMemory(){
+        if(containing_bin == nullptr || containing_bin->bin_index == BIG_BOI_BIN_INDEX)
+            return nullptr;
+        Block* possible_new_block = (Block*)(((void*)this)+udata_size);
+        if(possible_new_block == sbrk(0))
+            return nullptr;
+        return possible_new_block;
+    }
+
+    /**
+     * if this is free and block after it in memory exits and is free - merege with it, correcting all fields.
+     */
+    void tryMeregeWithAfterInMemory(){
+        if(!is_free)
+            return;
+        Block* after = getAfterInMemory();    
+        if(after == nullptr || !after->is_free)
+            return;
+        //otherwise, we have to merege them together:
+        after->removeFromContainingBin();
+        after->is_free = true;
+        //this last line of code theoreticaly does nothing, but might protect the user if he frees the same block multiple times. 
+
+        //this block 'takes on' the size of the block after it:
+        udata_size += after->getTotalSize();
+        //the size of 'this' has changed, so we need to correct it's position to the right place:
+        correctPositionInBinTable();
+    }
+public:
+    /**
+     * if this is not free, do nothing.
+     * otherwise, for any of it's neighbor that are free (next or prex), merege them together
+     *  (and correct all pointers, size values etc).
+     */
+    void meregeWithNeighborsIfPossible(){
+        tryMeregeWithAfterInMemory();
+        if(before_sbrk_block != nullptr)
+            before_in_memory->tryMeregeWithAfterInMemory();
     }
 
     /**
@@ -68,17 +123,6 @@ public:
         
         return this->containing_bin->inBinSizeRange(this->getTotalSize()); 
     }
-
-    /**
-     * completely swaps the positons of the two blocks with eachother in terms of:
-     *      1. the blocks around 'this' and 'other'
-     *      2. the internal pointers within 'this' and 'other'
-     *      3. the bins that contain 'this' and 'other'
-     *  if 'other' is null, does nothing.
-     */
-    // void swapPositionWithBlock(Block* other){
-        
-    // }
 
     /**
      * swaps 'this' with the next block, correcting for pointers of both blocks,
@@ -211,8 +255,6 @@ public:
     }
 };
 
-typedef unsigned int index_t;
-
 /**
  * a double-linked-list of Blocks. each block must maintain that
  *      the total size of the block is within: '[KB_bytes*bin_index, KB_bytes*(bin_index+1))'.
@@ -247,6 +289,8 @@ public:
      * returns the maximal total block size that should be in this bin.
      */
     size_t binMaxSize() const{
+        if(bin_index == BIG_BOI_BIN_INDEX)
+            return MAX_BLOCK_SIZE;
         return KB_bytes*(bin_index+1)-1;
     }
     /**
@@ -262,11 +306,13 @@ public:
     bool inBinSizeRange(size_t total_size) const{
         return total_size >= binMaxSize() && binMaxSize() >= total_size;
     }
+
+private:
     /**
-     * finds the smallest block in the bin that a block of 'total_size' can fit in, and returns a pointer to it.
+     * finds the smallest block in this bin (only looks in this bin!) that a block of 'total_size' can fit in, and returns a pointer to it.
      * if one does not exits, returns null;
      */
-    Block* findSmallestBlockThatFits(size_t total_size){
+    Block* findSmallestBlockThatFitsInBin(size_t total_size){
         Block* cur_block = smallest;
         while(cur_block != nullptr){
             if(cur_block->is_free && cur_block->getTotalSize() >= total_size){
@@ -277,6 +323,23 @@ public:
         }
         return nullptr;
     }
+public:
+    /**
+     * looks for a block that can fit an object with total size that is atleast the parameter 'total_size'.
+     * starts looking within this bin, and if one is not found it continues looking in the next bin,
+     * unless the next bin is the one with index, BIN_BOI_BIN_INDEX, in which case the method returns null.
+     */
+    Block* findSmallestFitInTable(size_t total_size){
+        //there is not fit in BIG_BOI_BIN, and all of blocks should be non_free anyways.
+        if(bin_index == BIG_BOI_BIN_INDEX)
+            return nullptr;
+        //try finding the best fit in this bin:
+        Block* res = findSmallestBlockThatFitsInBin(total_size);
+        if(res != nullptr)
+            return res;
+        //try looking in the next block:
+        return getBinTable()[bin_index+1].findSmallestFitInTable(total_size);
+    }
     
     /**
      * returns the index of the bin that should hold a block with 
@@ -284,21 +347,64 @@ public:
      * the 'index' of the bin should be s.t. 'total_size' is in '[KB_bytes*index, KB_bytes*(index+1))'. 
      */
     static index_t getBinIndexForSize(size_t total_size){
-        if(total_size/KB_bytes != (total_size-1)/KB_bytes)
-            return total_size/KB_bytes+1;
-        return total_size/KB_bytes;
+        if(total_size > MAX_BLOCK_SIZE)
+            return NO_LEGAL_INDEX;
+        size_t bin_index = total_size/KB_bytes;
+        if(bin_index > BIG_BOI_BIN_INDEX)
+            bin_index = BIG_BOI_BIN_INDEX;
+        return bin_index;
+        // if(total_size/KB_bytes != (total_size-1)/KB_bytes)
+        //     simple_index = total_size/KB_bytes+1;
+        // else
+        //     simple_index = total_size/KB_bytes;   
     }
 
     /**
-     * tries to allocate new space for a block with TOTAL 'total_size' by calling 'sbrk()',
-     *      if fails, reuturns NULL, otherwise - initializes a new block in the allocated space,
-     *      inserts it as the last item in the block list, and returns a pointer to it.
+     * tries to allocate new space for a block with TOTAL 'total_size' by calling 'sbrk()' or 'mmap()',
+     *      if they fail or if size is more than MAX_BLOCK_SIZE - returns null.
+     * otherwise - initializes a new block in the allocated space, and returns a pointer to it.
+     * DOES NOT insert the block to it's correct place in the bin-table.
      */
     Block* allocateNewBlock(size_t total_size){
-        Block* new_block; 
+        Block* new_block;
         //in the the case that the new block is too big for the regular bins:
-        //new_block = (Block*)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, -1, 0);
-    }  
+        index_t bin_index = getBinIndexForSize(total_size);
+
+        size_t size_missing = 0;
+        Block* before_in_mem = nullptr;
+        switch (bin_index)
+        {
+        case NO_LEGAL_INDEX://the block is too big:
+            return nullptr;
+            break;
+        case BIG_BOI_BIN_INDEX://the block should be allocated with mmap:
+            new_block = (Block*)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if(new_block == nullptr)
+                return nullptr;
+            break;
+        default://the block should be in a 'regular' bin:
+            //find the address where the new block will start, and how much more space it will need:
+            if(last_sbrk_block != nullptr && last_sbrk_block->is_free){
+                last_sbrk_block->removeFromContainingBin();
+                size_missing = (size_t)last_sbrk_block + total_size - (size_t)sbrk(0);
+                new_block = last_sbrk_block;
+            } else {
+                size_missing = total_size;
+                new_block = (Block*)sbrk(0);
+            } 
+            //allocate that new space as needed:
+            if(sbrk(size_missing) == nullptr)
+                return nullptr;
+            break;
+            if(first_block_from_brk == nullptr)
+                first_block_from_brk = new_block;
+            last_sbrk_block = new_block;
+            before_in_mem = last_sbrk_block;
+        }
+        //initialize the values of the new block:
+        *new_block = Block(false, nullptr, nullptr, total_size-sizeof(Block), nullptr, before_in_mem);
+        return new_block;
+    }
 };
 
 /**
@@ -308,12 +414,70 @@ public:
  * the function will initialize the bin table the first time it is called, and from there on simple return it.
  */
 static Bin* getBinTable(){
-    static const unsigned int num_bins = 128;
-    //this part should call the default constructor num_bins times.
-    static Bin bin_table[num_bins];
-    
+    //bin 128=BIG_BOI_BIN_INDEX (the last one) is special, it hold all of the blocks that are too bin to be in any of the other bins.
+    static Bin bin_table[NUM_BINS];
+    //this line should call the default constructor 'NUM_BINS' times, each time creating a bin with the next index.    
+
     return bin_table;
 }
+
+/**
+ * @brief given the wanted size of the user data, first tries to find a existing block that can fit it,
+ * and allocates a new one if needed. in addition does the following:
+ *      1. this function will do all of the corrections needed to maintain the data structure.
+ *      2. if an existing block with enough size was found, the function will split it as needed.
+ *      3. the appropriate allocation will be done with either sbrk or mmap as needed.
+ *      4. if a new (sbrk) allocation is made and the block closest to brk is free, the new block will merege with the last.
+ * @return the functions will normally return a pointer to the user-data that was requested, but will fail
+ *  (and return null) in the following cases:
+ *      1. udata_size is more than MAX_BLOCK_SIZE.
+ *      2. srbk() or mmap() have failed.
+ */
+static void* completeSearchAndAllocate(size_t udata_size){
+    if(size == 0 || size > MAX_BLOCK_SIZE)
+        return nullptr;
+    size_t udata_size = size;
+    size_t min_block_total_size = udata_size+sizeof(Block);
+    Bin* bin = Bin::getProperBinForSize(min_block_total_size);
+    
+    Block* res_block;
+    //if we dont have to allocate a new block:
+    if(bin->bin_index != BIG_BOI_BIN_INDEX
+    &&(res_block = bin->findSmallestFitInTable(min_block_total_size)) != nullptr){
+        res_block->splitAndCorrectIfPossible(min_block_total_size);   
+    }
+    //if we have to allocate a new block:
+    else {
+        res_block = bin->allocateNewBlock(min_block_total_size);
+        res_block->correctPositionInBinTable();
+    }
+
+    return res_block->getStartOfUdata();
+}
+
+/**
+ * changes the values of all bytes in memory to 0: starting with 'start_addr', 
+ *      and ending with 'start_addr+num_bytes-1' (including the last one).
+ */
+static void zeroOutBytes(void* start_addr, size_t num_bytes){
+    memset(start_addr, 0, num_bytes);
+}
+
+/**
+ * copies 'num_bytes' bytes from 'src' to 'dst'.
+ */
+static void copyBytes(void* src, void* dst, size_t num_bytes){
+    memcpy(dst, src, num_bytes);
+}
+
+#define forEachBlock(todo) \
+    for(index_t __bindex = 0; __bindex < NUM_BINS; ++__bindex){\
+        Block* cur_block = getBinTable()[bindex].smallest;\
+        while(cur_block != nullptr){\
+            todo;\
+            cur_block = cur_block->next;\
+        }\
+    }\
 
 /*
 ============ Interface: ==================================================================================================================================
@@ -323,24 +487,10 @@ static Bin* getBinTable(){
  * @brief Searches for a free block up to 'size' bytes or allocates a new one if serach fails.
  * @return
  *      success - returns a pointer to the first byte in the allocated block (excluding meta-data).
- *      failure - returns null in the following cases: 'size' is 0 or more than 100000000, 'sbrk()' fails.
+ *      failure - returns null in the following cases: 'size' is 0 or more than MAX_BLOCK_SIZE, 'sbrk()' fails.
  */
 void* smalloc(size_t size){
-    if(size == 0 || size > 100000000)
-        return nullptr;
-    size_t min_block_total_size = size+sizeof(Block);
-    Bin* bin = Bin::getProperBinForSize(min_block_total_size);
-    
-    Block* housing_block = bin->findSmallestBlockThatFits(min_block_total_size);
-    if(housing_block != nullptr){
-        housing_block->splitAndCorrectIfPossible(min_block_total_size);
-        return housing_block->getStartOfUdata();
-    }
-    
-    housing_block = bin->allocateNewBlock(min_block_total_size);
-    if(housing_block == nullptr)
-        return nullptr;
-    return housing_block->getStartOfUdata();
+    return completeSearchAndAllocate(size);
 }
 
 /**
@@ -348,10 +498,18 @@ void* smalloc(size_t size){
  *      or allocates if none are found. in other words, find/allocate size*num bytes and set all bytes to 0.
  * @return
  *      success - returns a pointer to the first byte in the allocated block (excluding meta-data).
- *      failure - returns null in the following cases: 'size' is 0 or more than 100000000, 'sbrk()' fails.
+ *      failure - returns null in the following cases: 'size' is 0 or more than MAX_BLOCK_SIZE, 'sbrk()' fails.
  */
 void* scalloc(size_t num, size_t size){
-
+    void* udata_res = completeSearchAndAllocate(size*num);
+    if(udata_res != nullptr){//if a space was actualy found, zero it out:
+        Block* block_res = Block::getBlockFromAllocatedUdata(udata_res);
+        if(block_res->containing_bin->bin_index != BIG_BOI_BIN_INDEX){
+            //(in the case of an mmap allocation, the space is already zeroed so we can skip this)
+            zeroOutBytes(block_res->getStartOfUdata(), block_res->udata_size);
+        } 
+    }
+    return udata_res;
 }
 
 /**
@@ -360,7 +518,18 @@ void* scalloc(size_t num, size_t size){
  * assumes 'p' truely points to the start or an allocated block.
  */
 void sfree(void* p){
+    if(p == nullptr)
+        return;
+    Block* block = Block::getBlockFromAllocatedUdata(p);
+    if(block->is_free)
+        return;
+    block->is_free = ture;
 
+    if(block->containing_bin->bin_index == BIG_BOI_BIN_INDEX){
+        munmap(block, block->getTotalSize());
+    } else {
+        block->meregeWithNeighborsIfPossible();
+    }
 }
 
 /**
@@ -371,10 +540,25 @@ void sfree(void* p){
  * if 'oldp' is null, allocates space for 'size' bytes and return pointer. 
  * @return 
  *      success - returns a pointer to the first byte in the allocated block (excluding meta-data).
- *      failure - returns null in the following cases: 'size' is 0 or more than 100000000, 'sbrk()' fails.
+ *      failure - returns null in the following cases: 'size' is 0 or more than MAX_BLOCK_SIZE, 'sbrk()' fails.
  * does not free 'oldp' is srealloc fails.
  */
 void* srealloc(void* oldp, size_t size){
+    size_t wanted_total_size = size + sizeof(Block)+size;
+    //if there is no need to change the block:
+    Block* block = Block::getBlockFromAllocatedUdata(oldp);
+    if(block->getTotalSize() >= size){
+        block->splitAndCorrectIfPossible(wanted_total_size);
+        return block->getStartOfUdata();
+    }
+    //if we have to find a new block:
+    void* res = completeSearchAndAllocate(size);
+    if(res != nullptr){
+        //if new space was actually allocated, copy the user data, and free the old block:
+        copyBytes(oldp, res, block->udata_size);
+        sfree(oldp);
+    }
+    return res;
 }   
 
 
@@ -382,32 +566,46 @@ void* srealloc(void* oldp, size_t size){
  * Returns the number of allocated blocks in the heap that are currently free.
  */
 size_t _num_free_blocks(){
+    unsigned int counter = 0;
+    forEachBlock(counter += cur_block->is_free);
+    return counter;
 }
 /**
  * Returns the number of bytes in all allocated blocks in the heap that are currently free,
  * excluding the bytes used by the meta-data structs.
  */
 size_t _num_free_bytes(){
+    size_t tot_free = 0;
+    forEachBlock(tot_free += (cur_block->is_free ? cur_block->udata_size : 0));
+    return tot_free;
 }
 /**
  * Returns the overall (free and used) number of allocated blocks in the heap.
  */
 size_t _num_allocated_blocks(){
+    unsigned int counter = 0;
+    forEachBlock(++counter);
+    return counter;
 }
 /**
  * Returns the overall number (free and used) of allocated bytes in the heap, excluding
  * the bytes used by the meta-data structs.
  */
 size_t _num_allocated_bytes(){
-}
-/**
- * Returns the overall number of meta-data bytes currently in the heap.
- */
-size_t _num_meta_data_bytes(){
+    size_t tot_alloc = 0;
+    forEachBlock(tot_alloc += cur_block->udata_size);
+    return tot_alloc;
 }
 /**
  * Returns the number of bytes of a single meta-data structure in your system.
  */
 size_t _size_meta_data(){
+    return sizeof(Block);
+}
+/**
+ * Returns the overall number of meta-data bytes currently in the heap.
+ */
+size_t _num_meta_data_bytes(){
+    return _size_meta_data()*_num_allocated_blocks();
 }
 
