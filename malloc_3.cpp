@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <cstring>//for memcpy and memset
 #include <sys/mman.h>
 
 class Bin;
@@ -12,8 +13,8 @@ static const index_t NO_LEGAL_INDEX = NUM_BINS;
 
 static Block* last_sbrk_block = nullptr;
 
-static bool isInCorrectBinTablePosition(Block* block);
-static void correctPositionInBinTable(Block* block);
+static Bin* getBinTable();
+size_t _size_meta_data();
 
 class Block{
 public:
@@ -42,7 +43,7 @@ public:
         return sizeof(Block) + udata_size;
     }
     void* getStartOfUdata() const{
-        return (void*)this + sizeof(Block);
+        return (void*)(((size_t)this) + sizeof(Block));
     }
     /**
      * if the total size is sufficiant to house both a block of size 'first_block_total_size',
@@ -56,7 +57,7 @@ public:
         //if the split can be made:
         if(getTotalSize() >= first_block_total_size + sizeof(Block) + min_udata_size_for_split){
             //find the position of the new block and initialize it's value:
-            Block* new_block = (Block*)((void*)this + sizeof(Block) + first_block_total_size);
+            Block* new_block = (Block*)((size_t)this + sizeof(Block) + first_block_total_size);
             size_t new_block_udata_size = this->getTotalSize()-sizeof(Block)*2-first_block_total_size;
             *new_block = Block(true, nullptr, nullptr, new_block_udata_size, nullptr, this);
             //update the size of the existing block:
@@ -65,6 +66,7 @@ public:
             //make sure all of the blocks are in the correct positions:
             this->correctPositionInBinTable();
             new_block->correctPositionInBinTable();
+            return new_block;
         } else
             return nullptr;
     }
@@ -73,14 +75,7 @@ private:
      * returns the block that is right after 'this' in memory,
      * if one does not exist or if 'this' is the the mmap'ed bin, returns null.
      */
-    Block* getAfterInMemory(){
-        if(containing_bin == nullptr || containing_bin->bin_index == BIG_BOI_BIN_INDEX)
-            return nullptr;
-        Block* possible_new_block = (Block*)(((void*)this)+udata_size);
-        if(possible_new_block == sbrk(0))
-            return nullptr;
-        return possible_new_block;
-    }
+    Block* getAfterInMemory() const;
 
     /**
      * if this is free and block after it in memory exits and is free - merege with it, correcting all fields.
@@ -109,7 +104,7 @@ public:
      */
     void meregeWithNeighborsIfPossible(){
         tryMeregeWithAfterInMemory();
-        if(before_sbrk_block != nullptr)
+        if(before_in_memory != nullptr)
             before_in_memory->tryMeregeWithAfterInMemory();
     }
 
@@ -117,66 +112,19 @@ public:
      * returns wether the bin should be in the bin it is currently in, according to it's size.
      * returns false if containing_bin is null. (it is in no bin, so definitely not the correct one)
      */
-    bool isInCorrectBin() const{
-        if(containing_bin == nullptr)
-            return false;
-        
-        return this->containing_bin->inBinSizeRange(this->getTotalSize()); 
-    }
+    bool isInCorrectBin() const;
 
     /**
      * swaps 'this' with the next block, correcting for pointers of both blocks,
      *  the blocks around them and the pointers in the bin that contains them.
      */
-    void siftWithNext(){
-        //fix pointers of srounding blocks:
-        if(next->next != nullptr)
-            next->next->prev = this;
-        if(prev != nullptr)
-            prev->next = next;
-
-        //fix pointers of containing bin:
-        if(next == containing_bin->biggest)
-            containing_bin->biggest = this;
-        if(this == containing_bin->smallest)
-            containing_bin->smallest = next;
-
-        //fix the pointers of this and this->next:
-        Block* old_next = next;
-        Block* new_next = old_next->next;
-        Block* old_prev = prev;
-        next = new_next;
-        prev = old_next;
-        old_next->next = this;
-        old_next->prev = old_prev;
-    }
+    void siftWithNext();
     
     /**
      * swaps 'this' with the prev block, correcting for pointers of both blocks,
      *  the blocks around them and the pointers in the bin that contains them.
      */
-    void siftWithPrev(){
-        //fix pointers of srounding blocks:
-        if(prev->prev != nullptr)
-            prev->prev->next = this;
-        if(next != nullptr)
-            next->prev = prev;
-
-        //fix pointers of containing bin:
-        if(prev == containing_bin->smallest)
-            containing_bin->smallest = this;
-        if(this == containing_bin->biggest)
-            containing_bin->biggest = prev;
-
-        //fix the pointer of this and this->prev:
-        Block* old_prev = prev;
-        Block* new_prev = old_prev->prev;
-        Block* old_next = next;
-        prev = old_prev->prev;
-        next = old_prev;
-        old_prev->prev = this;
-        old_prev->next = old_next;
-    }
+    void siftWithPrev();
 
     /**
      * changes the position of this Block within it's containing bin, untils the position satisfies:
@@ -187,7 +135,7 @@ public:
      */
     void siftToCorrectPositionWithinBin(){
         while(true){
-            if(next != nullptr && next->getTotalSize() < getTotalSize()))
+            if(next != nullptr && next->getTotalSize() < getTotalSize())
                 siftWithNext();
             else if(prev != nullptr && prev->getTotalSize() > getTotalSize())
                 siftWithPrev();
@@ -200,26 +148,7 @@ public:
      * changes containing_bin to null, and correct the fields of the blocks and prior bin
      * so that they do not point at 'this' anymore (and maybe point at something else as needed). 
      */
-    void removeFromContainingBin(){
-        Bin* bin = this->containing_bin;
-        if(bin == nullptr)
-            return;//a block with no bin thould have no blocks connected to it.
-        
-        if(bin->biggest == this)
-            bin->biggest = this->prev;
-        if(bin->smallest == this)
-            bin->smallest = this->next;
-        this->containing_bin = nullptr;
-
-        if(this->next != nullptr){
-            this->next->prev = this->prev;
-            this->next = nullptr;
-        }
-        if(this->prev != nullptr){
-            this->prev->next = this->next;
-            this->prev = nullptr;
-        }
-    }
+    void removeFromContainingBin();
 
     /**
      * assumes the parameter block has the correct value for the field 'udata_size'.
@@ -227,25 +156,7 @@ public:
      * will work if the block is in no bin or position {next, prev, containing_bin} are null.
      * does nothing if the block is already in the correct place.
      */
-    void correctPositionInBinTable(){
-        if(!isInCorrectBin()){
-            removeFromContainingBin();
-            
-            Bin* correct_bin = Bin::getProperBinForSize(this->getTotalSize());
-            //insert the block to the bin as the 'new smallest'
-            // - with possibly incorrect position because it might now be the smallest:
-            if(correct_bin->smallest != nullptr){
-                Block* old_smallest = correct_bin->smallest;
-                old_smallest->prev = this;
-                this->next = old_smallest;
-            } else 
-                correct_bin->biggest = this;
-            correct_bin->smallest = this;
-        }
-        
-        siftToCorrectPositionWithinBin();
-        //this part should work whether or not the block was inserted to a new bin.
-    }
+    void correctPositionInBinTable();
 
     /**
      * returns a pointer to the block s.t. 'udata_ptr' points to the udata of that block.
@@ -396,8 +307,8 @@ public:
             if(sbrk(size_missing) == nullptr)
                 return nullptr;
             break;
-            if(first_block_from_brk == nullptr)
-                first_block_from_brk = new_block;
+            // if(first_block_from_brk == nullptr)
+            //     first_block_from_brk = new_block;
             last_sbrk_block = new_block;
             before_in_mem = last_sbrk_block;
         }
@@ -406,6 +317,109 @@ public:
         return new_block;
     }
 };
+
+Block* Block::getAfterInMemory() const{
+    if(containing_bin == nullptr || containing_bin->bin_index == BIG_BOI_BIN_INDEX)
+        return nullptr;
+    Block* possible_new_block = (Block*)((size_t)this+udata_size);
+    if(possible_new_block == sbrk(0))
+        return nullptr;
+    return possible_new_block;
+}
+
+bool Block::isInCorrectBin() const{
+    if(containing_bin == nullptr)
+        return false;
+    
+    return this->containing_bin->inBinSizeRange(this->getTotalSize()); 
+}
+
+void Block::siftWithNext(){
+    //fix pointers of srounding blocks:
+    if(next->next != nullptr)
+        next->next->prev = this;
+    if(prev != nullptr)
+        prev->next = next;
+
+    //fix pointers of containing bin:
+    if(next == containing_bin->biggest)
+        containing_bin->biggest = this;
+    if(this == containing_bin->smallest)
+        containing_bin->smallest = next;
+
+    //fix the pointers of this and this->next:
+    Block* old_next = next;
+    Block* new_next = old_next->next;
+    Block* old_prev = prev;
+    next = new_next;
+    prev = old_next;
+    old_next->next = this;
+    old_next->prev = old_prev;
+}
+
+void Block::siftWithPrev(){
+    //fix pointers of srounding blocks:
+    if(prev->prev != nullptr)
+        prev->prev->next = this;
+    if(next != nullptr)
+        next->prev = prev;
+
+    //fix pointers of containing bin:
+    if(prev == containing_bin->smallest)
+        containing_bin->smallest = this;
+    if(this == containing_bin->biggest)
+        containing_bin->biggest = prev;
+
+    //fix the pointer of this and this->prev:
+    Block* old_prev = prev;
+    Block* new_prev = old_prev->prev;
+    Block* old_next = next;
+    prev = new_prev;
+    next = old_prev;
+    old_prev->prev = this;
+    old_prev->next = old_next;
+}
+
+void Block::removeFromContainingBin(){
+    Bin* bin = this->containing_bin;
+    if(bin == nullptr)
+        return;//a block with no bin thould have no blocks connected to it.
+    
+    if(bin->biggest == this)
+        bin->biggest = this->prev;
+    if(bin->smallest == this)
+        bin->smallest = this->next;
+    this->containing_bin = nullptr;
+
+    if(this->next != nullptr){
+        this->next->prev = this->prev;
+        this->next = nullptr;
+    }
+    if(this->prev != nullptr){
+        this->prev->next = this->next;
+        this->prev = nullptr;
+    }
+}
+
+void Block::correctPositionInBinTable(){
+    if(!isInCorrectBin()){
+        removeFromContainingBin();
+        
+        Bin* correct_bin = Bin::getProperBinForSize(this->getTotalSize());
+        //insert the block to the bin as the 'new smallest'
+        // - with possibly incorrect position because it might now be the smallest:
+        if(correct_bin->smallest != nullptr){
+            Block* old_smallest = correct_bin->smallest;
+            old_smallest->prev = this;
+            this->next = old_smallest;
+        } else 
+            correct_bin->biggest = this;
+        correct_bin->smallest = this;
+    }
+    
+    siftToCorrectPositionWithinBin();
+    //this part should work whether or not the block was inserted to a new bin.
+}
 
 /**
  * the allocation system has a single bin table that is infact an array of bins,
@@ -434,9 +448,8 @@ static Bin* getBinTable(){
  *      2. srbk() or mmap() have failed.
  */
 static void* completeSearchAndAllocate(size_t udata_size){
-    if(size == 0 || size > MAX_BLOCK_SIZE)
+    if(udata_size == 0 || udata_size > MAX_BLOCK_SIZE)
         return nullptr;
-    size_t udata_size = size;
     size_t min_block_total_size = udata_size+sizeof(Block);
     Bin* bin = Bin::getProperBinForSize(min_block_total_size);
     
@@ -472,7 +485,7 @@ static void copyBytes(void* src, void* dst, size_t num_bytes){
 
 #define forEachBlock(todo) \
     for(index_t __bindex = 0; __bindex < NUM_BINS; ++__bindex){\
-        Block* cur_block = getBinTable()[bindex].smallest;\
+        Block* cur_block = getBinTable()[__bindex].smallest;\
         while(cur_block != nullptr){\
             todo;\
             cur_block = cur_block->next;\
@@ -523,7 +536,7 @@ void sfree(void* p){
     Block* block = Block::getBlockFromAllocatedUdata(p);
     if(block->is_free)
         return;
-    block->is_free = ture;
+    block->is_free = true;
 
     if(block->containing_bin->bin_index == BIG_BOI_BIN_INDEX){
         munmap(block, block->getTotalSize());
