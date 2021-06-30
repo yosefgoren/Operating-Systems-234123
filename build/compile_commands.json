@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/student/hw4/wet/build",
+  "command": "/usr/bin/x86_64-linux-gnu-g++-7   -g -o CMakeFiles/malloc_3.dir/test_3.cpp.o -c /home/student/hw4/wet/test_3.cpp",
+  "file": "/home/student/hw4/wet/test_3.cpp"
+}
+]
