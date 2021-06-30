@@ -70,7 +70,7 @@ public:
         } else
             return nullptr;
     }
-private:
+
     /**
      * returns the block that is right after 'this' in memory,
      * if one does not exist or if 'this' is the the mmap'ed bin, returns null.
@@ -96,13 +96,13 @@ private:
         //the size of 'this' has changed, so we need to correct it's position to the right place:
         correctPositionInBinTable();
     }
-public:
+    
     /**
      * if this is not free, do nothing.
      * otherwise, for any of it's neighbor that are free (next or prex), merege them together
      *  (and correct all pointers, size values etc).
      */
-    void meregeWithNeighborsIfPossible(){
+    void tryMeregeWithNeighbors(){
         tryMeregeWithAfterInMemory();
         if(before_in_memory != nullptr)
             before_in_memory->tryMeregeWithAfterInMemory();
@@ -160,8 +160,11 @@ public:
 
     /**
      * returns a pointer to the block s.t. 'udata_ptr' points to the udata of that block.
+     * if the parameter is null, returns null.
      */
     static Block* getBlockFromAllocatedUdata(void* udata_ptr){
+        if(udata_ptr == nullptr)
+            return nullptr;
         return (Block*)((size_t)udata_ptr-sizeof(Block));
     }
 };
@@ -541,9 +544,28 @@ void sfree(void* p){
     if(block->containing_bin->bin_index == BIG_BOI_BIN_INDEX){
         munmap(block, block->getTotalSize());
     } else {
-        block->meregeWithNeighborsIfPossible();
+        block->tryMeregeWithNeighbors();
     }
 }
+
+// void* srealloc(void* oldp, size_t size){
+//     size_t wanted_total_size = size + sizeof(Block)+size;
+//     //if there is no need to change the block:
+//     Block* block = Block::getBlockFromAllocatedUdata(oldp);
+//     if(block->getTotalSize() >= wanted_total_size){
+//         block->splitAndCorrectIfPossible(wanted_total_size);
+//         return block->getStartOfUdata();
+//     }
+
+//     //if we have to find a new block:
+//     void* res = completeSearchAndAllocate(size);
+//     if(res != nullptr){
+//         //if new space was actually allocated, copy the user data, and free the old block:
+//         copyBytes(oldp, res, block->udata_size);
+//         sfree(oldp);
+//     }
+//     return res;
+// }
 
 /**
  * @brief f ‘size’ is smaller than the current block’s size, reuses the same block. Otherwise,
@@ -558,20 +580,51 @@ void sfree(void* p){
  */
 void* srealloc(void* oldp, size_t size){
     size_t wanted_total_size = size + sizeof(Block)+size;
+    Block* cur_block = Block::getBlockFromAllocatedUdata(oldp);
+    size_t old_udata_size = cur_block->udata_size;
+    Block* new_block = nullptr;
+
     //if there is no need to change the block:
-    Block* block = Block::getBlockFromAllocatedUdata(oldp);
-    if(block->getTotalSize() >= size){
-        block->splitAndCorrectIfPossible(wanted_total_size);
-        return block->getStartOfUdata();
+    if(cur_block->getTotalSize() >= wanted_total_size){
+        return oldp;
     }
-    //if we have to find a new block:
-    void* res = completeSearchAndAllocate(size);
-    if(res != nullptr){
-        //if new space was actually allocated, copy the user data, and free the old block:
-        copyBytes(oldp, res, block->udata_size);
-        sfree(oldp);
+
+    //if we should merege with the block before 'this' in memory:
+    if(cur_block->before_in_memory != nullptr
+    && cur_block->before_in_memory->is_free
+    && cur_block->before_in_memory->getTotalSize() + cur_block->getTotalSize() >= wanted_total_size){
+        new_block = cur_block->before_in_memory;
+        new_block->tryMeregeWithAfterInMemory();
+    } else
+    //if we should merege with the block after 'this' in memory: 
+    if(cur_block->getAfterInMemory() != nullptr
+    && cur_block->getAfterInMemory()->is_free
+    && cur_block->getAfterInMemory()->getTotalSize() + cur_block->getTotalSize() >= wanted_total_size){
+        new_block = cur_block;
+        new_block->tryMeregeWithAfterInMemory();
+    } else
+    //if we should merege with both the neighbors of 'this':
+    if(cur_block->getAfterInMemory() != nullptr
+    && cur_block->before_in_memory != nullptr
+    && cur_block->getAfterInMemory()->is_free
+    && cur_block->before_in_memory->is_free
+    && cur_block->getAfterInMemory()->getTotalSize() + cur_block->getAfterInMemory()->getTotalSize()
+        + cur_block->getTotalSize() >= wanted_total_size){
+        new_block = cur_block->before_in_memory;
+        new_block->tryMeregeWithNeighbors();
+    } else {//we have to look for space in the regular way (first in bin table and sbrk/mmap otherwise):
+        new_block = Block::getBlockFromAllocatedUdata(completeSearchAndAllocate(size));
+        if(new_block == nullptr)
+            return nullptr;
+        cur_block->removeFromContainingBin();
     }
-    return res;
+
+    //at this point, we have found some block with the reqested size (new_block), the old block was removed if it was needed.
+    //now we update the allocation data structure to handle the change, and copy the old user data:
+    new_block->splitAndCorrectIfPossible(wanted_total_size);
+    memmove(new_block->getStartOfUdata(), oldp, old_udata_size);
+    
+    return new_block->getStartOfUdata();
 }   
 
 
