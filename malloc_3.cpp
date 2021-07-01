@@ -57,9 +57,10 @@ public:
         //if the split can be made:
         if(getTotalSize() >= first_block_total_size + sizeof(Block) + min_udata_size_for_split){
             //find the position of the new block and initialize it's value:
-            Block* new_block = (Block*)((size_t)this + sizeof(Block) + first_block_total_size);
-            //fix 'before_in_memory' field of the block after 'this':
-            getAfterInMemory()->before_in_memory = new_block;
+            Block* new_block = (Block*)((size_t)this + first_block_total_size);
+            //fix 'before_in_memory' field of the block after 'this' (if there is a block after):
+            if(getAfterInMemory() != nullptr)
+                getAfterInMemory()->before_in_memory = new_block;
             size_t new_block_udata_size = this->getTotalSize()-sizeof(Block)-first_block_total_size;//change here!
             *new_block = Block(true, nullptr, nullptr, new_block_udata_size, nullptr, this);
             //update the size of the existing block:
@@ -541,6 +542,7 @@ void sfree(void* p){
     block->is_free = true;
 
     if(block->containing_bin->bin_index == BIG_BOI_BIN_INDEX){
+        block->removeFromContainingBin();
         munmap(block, block->getTotalSize());
     } else {
         block->tryMeregeWithNeighbors();
@@ -567,15 +569,18 @@ void* srealloc(void* oldp, size_t size){
     size_t old_udata_size = cur_block->udata_size;
     Block* new_block = nullptr;
 
+    auto min = [](int x, int y){return x < y ? x : y;};
+
     //if the current block is from the mmap region:
-    // if(cur_block->containing_bin == nullptr || cur_block->containing_bin->bin_index == BIG_BOI_BIN_INDEX){
-    //     void* res = completeSearchAndAllocate(size);
-    //     if(res == nullptr)
-    //         return nullptr;
-    //     memmove(res, oldp, cur_block->udata_size);
-    //     sfree(oldp);
-    //     return res;
-    // } else
+    if(cur_block->containing_bin == nullptr || cur_block->containing_bin->bin_index == BIG_BOI_BIN_INDEX){
+        void* res = completeSearchAndAllocate(size);
+        if(res == nullptr)
+            return nullptr;
+        memmove(res, oldp, min(size, old_udata_size));
+        sfree(oldp);
+        return res;
+    }
+
     //if there is no need to change the block:
     if(cur_block->getTotalSize() >= wanted_total_size){
         cur_block->splitAndCorrectIfPossible(wanted_total_size);
@@ -619,7 +624,7 @@ void* srealloc(void* oldp, size_t size){
     //at this point, we have found some block with the reqested size (new_block), the old block was removed if it was needed.
     //now we update the allocation data structure to handle the change, and copy the old user data:
     new_block->splitAndCorrectIfPossible(wanted_total_size);
-    memmove(new_block->getStartOfUdata(), oldp, old_udata_size);
+    memmove(new_block->getStartOfUdata(), oldp, min(size, old_udata_size));
     
     return new_block->getStartOfUdata();
 }   

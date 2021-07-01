@@ -10,6 +10,51 @@
 #include "../malloc_3.cpp"
 #include "colors.h"
 #include <unistd.h>
+#include <execinfo.h>
+
+using std::cout;
+using std::endl;
+
+typedef Block Metadata3;
+
+
+int getDepth(){
+    int max_depth = 200;
+    void* buffer[max_depth];
+    int ret = backtrace(buffer, max_depth);
+    return ret-5;
+}
+
+void printIndentation(){
+    for(int i = 0; i < getDepth(); ++i)
+    cout << "   ";
+}
+
+#define outi(line) printIndentation(); cout << line;
+
+void printBlock(Block* block){
+    outi("printBlock: " << "status: " << (block->is_free ? "free" : "used")
+        << ". udata-size: " << block->udata_size << ". block-address: 0x");
+    printf("%lx. ", (size_t)block);
+    cout << (block->containing_bin == nullptr ? -1 : block->containing_bin->bin_index) << endl;
+}
+
+void printBin(Bin* bin){
+    outi("printBin: bin-index: " << bin->bin_index << endl);
+    Block* block = bin->smallest;
+    while(block != nullptr){
+        printBlock(block);
+        block = block->next;
+    }
+}
+
+void printTo(index_t index = 4){
+    outi("printTo:" << endl;)
+    for(Bin* bin = getBinTable(); bin != getBinTable()+index; ++bin){
+        printBin(bin);
+    }
+    printBin(getBinTable()+BIG_BOI_BIN_INDEX);
+}
 
 /////////////////////////////////////////////////////
 
@@ -20,7 +65,6 @@
 
 // Copy your type here
 // don't change anything from the one in malloc_3.c !!not even the order of args!!!
-typedef Block Metadata3;
 
 
 ///////////////////////////////////////////////////
@@ -45,6 +89,10 @@ stats current_stats;
 std::string default_block;
 std::string block_of_2;
 std::string block_of_3;
+
+void myprint(){
+	std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;
+}
 
 #define DO_MALLOC(x) do{ \
         if(!(x)){                \
@@ -333,9 +381,16 @@ std::string testSplitAndMerge(void *array[MAX_ALLOC]) {
 		return expected;
 	}
 
+	// myprint();
+	// printTo();
+
 	for (int i = 0 ; i < MAX_ALLOC ; ++i) {
 		DO_MALLOC(array[i] = smalloc(default_block_size));
 	}
+
+	// myprint();
+	// printTo();
+
 	checkStats(0, 0, __LINE__);
 	sfree(array[0]);
 	checkStats(0, 0, __LINE__);
@@ -471,6 +526,8 @@ std::string testReallocMMap(void *array[MAX_ALLOC]) {
 		DO_MALLOC(array[i] = smalloc(size_for_mmap));
 	}
 	
+	//printTo();
+
 	checkStats(MAX_ALLOC * size_for_mmap, MAX_ALLOC, __LINE__);
 
 	for (int i = 0 ; i < size_for_mmap ; ++i) {
@@ -547,6 +604,7 @@ std::string testReallocDec(void *array[MAX_ALLOC]) {
 #define PRED(x) x
 #define PGRN(x) x
 #endif
+
 
 void *getMemoryStart() {
 	void *first = smalloc(1);

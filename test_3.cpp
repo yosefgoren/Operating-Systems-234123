@@ -168,10 +168,7 @@ int main(){
     outi("main:" << endl);
     heap_start = sbrk(0);
     
-    smalloc(1);
-    printMemory();
-
-    //allocandFreeMerge();
-    
+    smalloc(1300000);
+    printTo();
     cout << "finished successfully\n";
 }
