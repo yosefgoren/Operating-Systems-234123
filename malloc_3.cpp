@@ -458,7 +458,8 @@ static void* completeSearchAndAllocate(size_t udata_size){
     //if we dont have to allocate a new block:
     if(bin->bin_index != BIG_BOI_BIN_INDEX
     &&(res_block = bin->findSmallestFitInTable(min_block_total_size)) != nullptr){
-        res_block->splitAndCorrectIfPossible(min_block_total_size);   
+        res_block->splitAndCorrectIfPossible(min_block_total_size);  
+        res_block->is_free=false; //  should this be here or (inside block ctor?) inside splitAndCorrectIfPossible above
     }
     //if we have to allocate a new block:
     else {
