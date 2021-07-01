@@ -1033,7 +1033,7 @@ int main() {
 	#endif
 	for (int i = 0 ; i < NUM_FUNC-sub ; ++i) {
 		#ifdef FORK
-		if(i == 11){
+		if(i == 16){
 			i = i+1;
 			i= i-1;
 		}

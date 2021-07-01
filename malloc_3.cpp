@@ -58,6 +58,9 @@ public:
         if(getTotalSize() >= first_block_total_size + sizeof(Block) + min_udata_size_for_split){
             //find the position of the new block and initialize it's value:
             Block* new_block = (Block*)((size_t)this + first_block_total_size);
+            //update wilderness block if needed:
+            if (this == last_sbrk_block)
+                last_sbrk_block = new_block;
             //fix 'before_in_memory' field of the block after 'this' (if there is a block after):
             if(getAfterInMemory() != nullptr)
                 getAfterInMemory()->before_in_memory = new_block;
@@ -91,6 +94,9 @@ public:
             return;
          
         //otherwise, we have to merege them together:
+        if (after == last_sbrk_block) {
+            last_sbrk_block = this;
+        }
         after->removeFromContainingBin();
         
         //if there is a block after 'this->after', fix it's 'before_in_memory' field:
@@ -112,6 +118,7 @@ public:
         tryMeregeWithAfterInMemory();
         if(before_in_memory != nullptr)
             before_in_memory->tryMeregeWithAfterInMemory();
+        
     }
 
     /**
@@ -609,12 +616,23 @@ void* srealloc(void* oldp, size_t size){
     && cur_block->before_in_memory->is_free
     && cur_block->getAfterInMemory()->getTotalSize() + cur_block->getAfterInMemory()->getTotalSize()
         + cur_block->getTotalSize() >= wanted_total_size){ 
-        new_block = cur_block->before_in_memory;
+        new_block = cur_block;
         new_block->tryMeregeWithNeighbors();
-    } else {//we have to look for space in the regular way (first in bin table and sbrk/mmap otherwise):
+        cur_block->is_free = false; // restore actuall is_free, might be redundent because already merged
+        new_block = cur_block->before_in_memory; //new block starts at the neighbor before_in_memory
+    } else
+    //if reallocated block is the wilderness
+    if (cur_block == last_sbrk_block) {
+        if (sbrk(size-cur_block->udata_size) == nullptr) 
+            return nullptr;
+        cur_block->udata_size = size;
+        cur_block->is_free = false;
+        return cur_block->getStartOfUdata();
+    }
+    else {//we have to look for space in the regular way (first in bin table and sbrk/mmap otherwise):
         new_block = Block::getBlockFromAllocatedUdata(completeSearchAndAllocate(size));
         if(new_block == nullptr){
-            new_block->is_free = false;
+            cur_block->is_free = false;
             return nullptr;
         }
         sfree(oldp);
