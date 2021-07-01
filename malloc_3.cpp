@@ -559,6 +559,9 @@ void sfree(void* p){
  * does not free 'oldp' is srealloc fails.
  */
 void* srealloc(void* oldp, size_t size){
+    if(oldp == nullptr || size >= MAX_BLOCK_SIZE || size == 0)
+        return nullptr;
+    
     size_t wanted_total_size = size + sizeof(Block);
     Block* cur_block = Block::getBlockFromAllocatedUdata(oldp);
     size_t old_udata_size = cur_block->udata_size;

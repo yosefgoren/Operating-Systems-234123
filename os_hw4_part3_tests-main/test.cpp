@@ -711,6 +711,9 @@ int main() {
 	#endif
 	for (int i = 0 ; i < NUM_FUNC-sub ; ++i) {
 		#ifdef FORK
+		if(i == 10){
+			i = 10*10/10;
+		}
 		pid_t pid = fork();
 		if (pid == 0) {
 		//printf("son starting!\n");
