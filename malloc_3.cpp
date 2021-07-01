@@ -602,7 +602,7 @@ void* srealloc(void* oldp, size_t size){
         new_block = Block::getBlockFromAllocatedUdata(completeSearchAndAllocate(size));
         if(new_block == nullptr)
             return nullptr;
-        cur_block->removeFromContainingBin();
+        sfree(oldp);
     }
 
     //at this point, we have found some block with the reqested size (new_block), the old block was removed if it was needed.
