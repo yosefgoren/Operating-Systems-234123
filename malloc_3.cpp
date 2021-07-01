@@ -60,10 +60,10 @@ public:
             Block* new_block = (Block*)((size_t)this + sizeof(Block) + first_block_total_size);
             //fix 'before_in_memory' field of the block after 'this':
             getAfterInMemory()->before_in_memory = new_block;
-            size_t new_block_udata_size = this->getTotalSize()-2*sizeof(Block)-first_block_total_size;//change here!
+            size_t new_block_udata_size = this->getTotalSize()-sizeof(Block)-first_block_total_size;//change here!
             *new_block = Block(true, nullptr, nullptr, new_block_udata_size, nullptr, this);
             //update the size of the existing block:
-            this->udata_size = first_block_total_size; //change here!
+            this->udata_size = first_block_total_size - sizeof(Block); //change here!
             
             //make sure all of the blocks are in the correct positions:
             this->correctPositionInBinTable();
