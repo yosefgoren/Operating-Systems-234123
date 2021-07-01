@@ -411,7 +411,7 @@ std::string testFreeAllAndMerge(void *array[MAX_ALLOC]) {
 	int allsize = 0;
 	for (int i = 0 ; i < MAX_ALLOC ; ++i) {
 		DO_MALLOC(array[i] = smalloc(i + 1));
-		std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
+		//std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
 		allsize += i + 1 + (int) sizeof(Metadata3);
 	}
 	checkStats(0, 0, __LINE__);
@@ -420,7 +420,7 @@ std::string testFreeAllAndMerge(void *array[MAX_ALLOC]) {
 
 	for (int i = 0 ; i < MAX_ALLOC ; ++i) {
 		sfree(array[i]);
-		std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
+		//std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
 	}
 	checkStats(0, 0, __LINE__);
 
@@ -686,7 +686,7 @@ void printEnd() {
 
 
 int main() {
-	printf("main starting!\n");
+	//printf("main starting!\n");
 	void *allocations[MAX_ALLOC];
 	using std::chrono::high_resolution_clock;
 	using std::chrono::duration_cast;
@@ -713,7 +713,7 @@ int main() {
 		#ifdef FORK
 		pid_t pid = fork();
 		if (pid == 0) {
-		printf("son starting!\n");
+		//printf("son starting!\n");
 			ans = checkFunc(functions[i], allocations, function_names[i]);
 			if (i == 0 && !ans) {
 				printInitFail();
