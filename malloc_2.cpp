@@ -4,7 +4,8 @@
 
 static const size_t MAX_BLOCK_SIZE = 100000000;
 
-struct Block {
+class Block {
+public:
     size_t udata_size;
     bool is_free;
 
@@ -27,7 +28,8 @@ struct Block {
 Block* blockFromUdata(void* udata){
     if(udata == nullptr)
         return nullptr;
-    return (Block*)((size_t)udata-sizeof(Block));
+    Block* res = (Block*)((size_t)udata-sizeof(Block)); 
+    return res;
 }
 
 Block* first_block = nullptr;
@@ -80,7 +82,7 @@ void* smalloc(size_t size){
     Block* res = firstFits(tot_size);
     if(res != nullptr){
         res->is_free = false;
-        return res;
+        return res->getUdataStart();
     }
     return newBlock(tot_size)->getUdataStart();
 }
@@ -106,10 +108,10 @@ void* srealloc(void* oldp, size_t size){
     if(illegalUSize(size))
         return nullptr;
     if(oldp == nullptr)
-        return nullptr;
+        return smalloc(size);
     Block* block = blockFromUdata(oldp);
     if(block->udata_size >= size)
-        return nullptr;
+        return oldp;
     void* res = smalloc(size);
     if(res == nullptr)
         return nullptr;

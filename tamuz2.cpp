@@ -343,6 +343,39 @@ void test_calloc() {
     assert(check_data(heap, DATA, 3, BLOCK_SIZES));
 }
 
+
+using std::cout;
+using std::endl;
+void printMemory(void *start=first_block, bool onlyList=true) {
+	Block* current = (Block*) start;
+	size_t size = 0;
+	int blocks = 0;
+	if (!onlyList) {
+		std::cout << "Printing Memory List\n";
+	}
+    Block* program_break = (Block*)sbrk(0);
+    while (current != program_break && current != nullptr) {
+        if (current->is_free) {
+			std::cout << "|F:" << current->udata_size;
+		} else {
+			std::cout << "|U:" << current->udata_size;
+		}
+		size += current->udata_size;
+		blocks++;
+//		current = current->next;
+        size_t effective_size = current->udata_size;
+        char * temp_ptr = (char *)current;
+        temp_ptr += effective_size + sizeof (Block);
+        current =  (Block *)temp_ptr;
+	}
+	std::cout << "|";
+	if (!onlyList) {
+		std::cout << std::endl << "Memory Info:\nNumber Of Blocks: " << blocks << "\nTotal Size (without Metadata): " << size << std::endl;
+		std::cout << "Size of Metadata: " << sizeof(Block) << std::endl;
+	}
+    cout << endl;
+}
+
 void test_realloc() {
     const size_t BLOCK_SIZES[BLOCK_MAX_COUNT] = {3,4,5, LAST};
     byte DATA[BLOCK_MAX_COUNT][BLOCK_MAX_SIZE] =
@@ -355,19 +388,24 @@ void test_realloc() {
     byte *p1, *p2, *p3;
 
     /* Allocate first */
+    printMemory();
     p1 = realloc_byte(NULL, BLOCK_SIZES[0]);
+    printMemory();
     add_expected_block(expected, BLOCK_SIZES[0]);
     assert_state(initial, expected);
     fill_data(DATA, &p1, 1, BLOCK_SIZES);
+    printMemory();
     assert(check_data(heap, DATA, 1, BLOCK_SIZES));
 
     /* Reallocate to same size (do nothing) */
     p1 = realloc_byte(p1, BLOCK_SIZES[0]);
+    printMemory();
     assert_state(initial, expected);
     assert(check_data(heap, DATA, 1, BLOCK_SIZES));
 
     /* Reallocate to bigger */
     p2 = realloc_byte(p1, BLOCK_SIZES[1]);
+    printMemory();
     add_expected_block(expected, BLOCK_SIZES[1]);
     free_expected_block(expected, BLOCK_SIZES[0]);
     DATA[0][0] = GARBAGE; DATA[0][1] = GARBAGE; DATA[0][2] = GARBAGE;

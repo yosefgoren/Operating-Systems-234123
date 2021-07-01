@@ -52,7 +52,7 @@ int main(){
 	intest_counter = 0;
 	current_test_name = "test_malloc_2";
 
-	int n = 10;
+	int n = 6;
 	char* arr[n];
 	for(int i = 0; i < n; ++i){
 		arr[i] = (char*)smalloc(i+1);
@@ -60,9 +60,12 @@ int main(){
 	}
 	printMemory();
 	
-	Block* b1 = blockFromUdata(arr[0]);
+	Block* b0 = blockFromUdata(arr[0]);
+	Block* b1 = b0->getBlockAfter();
 	Block* b2 = b1->getBlockAfter();
-	
+	Block* b3 = b2->getBlockAfter();
+	Block* b4 = b3->getBlockAfter();
+	Block* b5 = b4->getBlockAfter();
 	
 	for(int i = 0; i < n; i += 2){
 		sfree(arr[i]);
@@ -70,6 +73,7 @@ int main(){
 	printMemory();
 	for(int i = 0; i < n; i += 2){
 		arr[i] = (char*)smalloc(i+1);
+		printMemory();
 		*(arr[i]) = 'b';
 	}
 	printMemory();
