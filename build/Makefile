@@ -163,17 +163,30 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named malloc_3
+# Target rules for targets named ariel
 
 # Build rule for target.
-malloc_3: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 malloc_3
-.PHONY : malloc_3
+ariel: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ariel
+.PHONY : ariel
 
 # fast build rule for target.
-malloc_3/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/malloc_3.dir/build.make CMakeFiles/malloc_3.dir/build
-.PHONY : malloc_3/fast
+ariel/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ariel.dir/build.make CMakeFiles/ariel.dir/build
+.PHONY : ariel/fast
+
+#=============================================================================
+# Target rules for targets named test_3
+
+# Build rule for target.
+test_3: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_3
+.PHONY : test_3
+
+# fast build rule for target.
+test_3/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_3.dir/build.make CMakeFiles/test_3.dir/build
+.PHONY : test_3/fast
 
 #=============================================================================
 # Target rules for targets named ContinuousSubmit
@@ -539,13 +552,40 @@ ContinuousUpdate/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/ContinuousUpdate.dir/build.make CMakeFiles/ContinuousUpdate.dir/build
 .PHONY : ContinuousUpdate/fast
 
+os_hw4_part3_tests-main/test.o: os_hw4_part3_tests-main/test.cpp.o
+
+.PHONY : os_hw4_part3_tests-main/test.o
+
+# target to build an object file
+os_hw4_part3_tests-main/test.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ariel.dir/build.make CMakeFiles/ariel.dir/os_hw4_part3_tests-main/test.cpp.o
+.PHONY : os_hw4_part3_tests-main/test.cpp.o
+
+os_hw4_part3_tests-main/test.i: os_hw4_part3_tests-main/test.cpp.i
+
+.PHONY : os_hw4_part3_tests-main/test.i
+
+# target to preprocess a source file
+os_hw4_part3_tests-main/test.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ariel.dir/build.make CMakeFiles/ariel.dir/os_hw4_part3_tests-main/test.cpp.i
+.PHONY : os_hw4_part3_tests-main/test.cpp.i
+
+os_hw4_part3_tests-main/test.s: os_hw4_part3_tests-main/test.cpp.s
+
+.PHONY : os_hw4_part3_tests-main/test.s
+
+# target to generate assembly for a file
+os_hw4_part3_tests-main/test.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ariel.dir/build.make CMakeFiles/ariel.dir/os_hw4_part3_tests-main/test.cpp.s
+.PHONY : os_hw4_part3_tests-main/test.cpp.s
+
 test_3.o: test_3.cpp.o
 
 .PHONY : test_3.o
 
 # target to build an object file
 test_3.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/malloc_3.dir/build.make CMakeFiles/malloc_3.dir/test_3.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_3.dir/build.make CMakeFiles/test_3.dir/test_3.cpp.o
 .PHONY : test_3.cpp.o
 
 test_3.i: test_3.cpp.i
@@ -554,7 +594,7 @@ test_3.i: test_3.cpp.i
 
 # target to preprocess a source file
 test_3.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/malloc_3.dir/build.make CMakeFiles/malloc_3.dir/test_3.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_3.dir/build.make CMakeFiles/test_3.dir/test_3.cpp.i
 .PHONY : test_3.cpp.i
 
 test_3.s: test_3.cpp.s
@@ -563,7 +603,7 @@ test_3.s: test_3.cpp.s
 
 # target to generate assembly for a file
 test_3.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/malloc_3.dir/build.make CMakeFiles/malloc_3.dir/test_3.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_3.dir/build.make CMakeFiles/test_3.dir/test_3.cpp.s
 .PHONY : test_3.cpp.s
 
 # Help Target
@@ -605,7 +645,11 @@ help:
 	@echo "... NightlySubmit"
 	@echo "... NightlyTest"
 	@echo "... NightlyUpdate"
-	@echo "... malloc_3"
+	@echo "... ariel"
+	@echo "... test_3"
+	@echo "... os_hw4_part3_tests-main/test.o"
+	@echo "... os_hw4_part3_tests-main/test.i"
+	@echo "... os_hw4_part3_tests-main/test.s"
 	@echo "... test_3.o"
 	@echo "... test_3.i"
 	@echo "... test_3.s"

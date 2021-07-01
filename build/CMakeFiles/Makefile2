@@ -72,7 +72,8 @@ CMAKE_BINARY_DIR = /home/student/hw4/wet/build
 # Directory level rules for the build root directory
 
 # The main recursive "all" target.
-all: CMakeFiles/malloc_3.dir/all
+all: CMakeFiles/ariel.dir/all
+all: CMakeFiles/test_3.dir/all
 
 .PHONY : all
 
@@ -82,7 +83,8 @@ preinstall:
 .PHONY : preinstall
 
 # The main recursive "clean" target.
-clean: CMakeFiles/malloc_3.dir/clean
+clean: CMakeFiles/ariel.dir/clean
+clean: CMakeFiles/test_3.dir/clean
 clean: CMakeFiles/ContinuousSubmit.dir/clean
 clean: CMakeFiles/ContinuousCoverage.dir/clean
 clean: CMakeFiles/ContinuousTest.dir/clean
@@ -115,31 +117,58 @@ clean: CMakeFiles/ContinuousUpdate.dir/clean
 .PHONY : clean
 
 #=============================================================================
-# Target rules for target CMakeFiles/malloc_3.dir
+# Target rules for target CMakeFiles/ariel.dir
 
 # All Build rule for target.
-CMakeFiles/malloc_3.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/malloc_3.dir/build.make CMakeFiles/malloc_3.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/malloc_3.dir/build.make CMakeFiles/malloc_3.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/student/hw4/wet/build/CMakeFiles --progress-num=1,2 "Built target malloc_3"
-.PHONY : CMakeFiles/malloc_3.dir/all
+CMakeFiles/ariel.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ariel.dir/build.make CMakeFiles/ariel.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ariel.dir/build.make CMakeFiles/ariel.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/student/hw4/wet/build/CMakeFiles --progress-num=1,2 "Built target ariel"
+.PHONY : CMakeFiles/ariel.dir/all
 
 # Build rule for subdir invocation for target.
-CMakeFiles/malloc_3.dir/rule: cmake_check_build_system
+CMakeFiles/ariel.dir/rule: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/student/hw4/wet/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/malloc_3.dir/all
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/ariel.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/student/hw4/wet/build/CMakeFiles 0
-.PHONY : CMakeFiles/malloc_3.dir/rule
+.PHONY : CMakeFiles/ariel.dir/rule
 
 # Convenience name for target.
-malloc_3: CMakeFiles/malloc_3.dir/rule
+ariel: CMakeFiles/ariel.dir/rule
 
-.PHONY : malloc_3
+.PHONY : ariel
 
 # clean rule for target.
-CMakeFiles/malloc_3.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/malloc_3.dir/build.make CMakeFiles/malloc_3.dir/clean
-.PHONY : CMakeFiles/malloc_3.dir/clean
+CMakeFiles/ariel.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ariel.dir/build.make CMakeFiles/ariel.dir/clean
+.PHONY : CMakeFiles/ariel.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/test_3.dir
+
+# All Build rule for target.
+CMakeFiles/test_3.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_3.dir/build.make CMakeFiles/test_3.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_3.dir/build.make CMakeFiles/test_3.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/student/hw4/wet/build/CMakeFiles --progress-num=3,4 "Built target test_3"
+.PHONY : CMakeFiles/test_3.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/test_3.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/student/hw4/wet/build/CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_3.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/student/hw4/wet/build/CMakeFiles 0
+.PHONY : CMakeFiles/test_3.dir/rule
+
+# Convenience name for target.
+test_3: CMakeFiles/test_3.dir/rule
+
+.PHONY : test_3
+
+# clean rule for target.
+CMakeFiles/test_3.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_3.dir/build.make CMakeFiles/test_3.dir/clean
+.PHONY : CMakeFiles/test_3.dir/clean
 
 #=============================================================================
 # Target rules for target CMakeFiles/ContinuousSubmit.dir

@@ -1,6 +1,7 @@
 /home/student/hw4/wet/build/CMakeFiles/rebuild_cache.dir
 /home/student/hw4/wet/build/CMakeFiles/edit_cache.dir
-/home/student/hw4/wet/build/CMakeFiles/malloc_3.dir
+/home/student/hw4/wet/build/CMakeFiles/ariel.dir
+/home/student/hw4/wet/build/CMakeFiles/test_3.dir
 /home/student/hw4/wet/build/CMakeFiles/ContinuousSubmit.dir
 /home/student/hw4/wet/build/CMakeFiles/ContinuousCoverage.dir
 /home/student/hw4/wet/build/CMakeFiles/ContinuousTest.dir
