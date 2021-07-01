@@ -60,10 +60,10 @@ public:
             Block* new_block = (Block*)((size_t)this + sizeof(Block) + first_block_total_size);
             //fix 'before_in_memory' field of the block after 'this':
             getAfterInMemory()->before_in_memory = new_block;
-            size_t new_block_udata_size = this->getTotalSize()-sizeof(Block)*2-first_block_total_size;
+            size_t new_block_udata_size = this->getTotalSize()-2*sizeof(Block)-first_block_total_size;//change here!
             *new_block = Block(true, nullptr, nullptr, new_block_udata_size, nullptr, this);
             //update the size of the existing block:
-            this->udata_size = first_block_total_size; 
+            this->udata_size = first_block_total_size; //change here!
             
             //make sure all of the blocks are in the correct positions:
             this->correctPositionInBinTable();
@@ -567,12 +567,21 @@ void* srealloc(void* oldp, size_t size){
     size_t old_udata_size = cur_block->udata_size;
     Block* new_block = nullptr;
 
+    //if the current block is from the mmap region:
+    // if(cur_block->containing_bin == nullptr || cur_block->containing_bin->bin_index == BIG_BOI_BIN_INDEX){
+    //     void* res = completeSearchAndAllocate(size);
+    //     if(res == nullptr)
+    //         return nullptr;
+    //     memmove(res, oldp, cur_block->udata_size);
+    //     sfree(oldp);
+    //     return res;
+    // } else
     //if there is no need to change the block:
     if(cur_block->getTotalSize() >= wanted_total_size){
+        cur_block->splitAndCorrectIfPossible(wanted_total_size);
         return oldp;
     }
-
-    cur_block->is_free = true;//for now, until memory will be copied. 
+    cur_block->is_free = true;//for now, until memory will be copied.
     //if we should merege with the block before 'this' in memory:
     if(cur_block->before_in_memory != nullptr
     && cur_block->before_in_memory->is_free
@@ -594,7 +603,7 @@ void* srealloc(void* oldp, size_t size){
     && cur_block->getAfterInMemory()->is_free
     && cur_block->before_in_memory->is_free
     && cur_block->getAfterInMemory()->getTotalSize() + cur_block->getAfterInMemory()->getTotalSize()
-        + cur_block->getTotalSize() >= wanted_total_size){
+        + cur_block->getTotalSize() >= wanted_total_size){ 
         new_block = cur_block->before_in_memory;
         new_block->tryMeregeWithNeighbors();
     } else {//we have to look for space in the regular way (first in bin table and sbrk/mmap otherwise):

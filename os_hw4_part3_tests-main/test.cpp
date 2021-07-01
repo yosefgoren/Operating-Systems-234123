@@ -707,8 +707,6 @@ int main() {
 	printStartRunningTests();
 
 	auto t1 = high_resolution_clock::now();
-
-	
 	int sub = 0;
 	#define FORK
 	#ifndef FORK
@@ -716,7 +714,7 @@ int main() {
 	#endif
 	for (int i = 0 ; i < NUM_FUNC-sub ; ++i) {
 		#ifdef FORK
-		if(i == 7){
+		if(i == 11){
 			i = i+1;
 			i= i-1;
 		}
