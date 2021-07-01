@@ -559,7 +559,7 @@ void sfree(void* p){
  * does not free 'oldp' is srealloc fails.
  */
 void* srealloc(void* oldp, size_t size){
-    size_t wanted_total_size = size + sizeof(Block)+size;
+    size_t wanted_total_size = size + sizeof(Block); //was aditional +size;
     Block* cur_block = Block::getBlockFromAllocatedUdata(oldp);
     size_t old_udata_size = cur_block->udata_size;
     Block* new_block = nullptr;
@@ -574,7 +574,10 @@ void* srealloc(void* oldp, size_t size){
     && cur_block->before_in_memory->is_free
     && cur_block->before_in_memory->getTotalSize() + cur_block->getTotalSize() >= wanted_total_size){
         new_block = cur_block->before_in_memory;
+        cur_block->is_free = true; // actually false, but need to merge
         new_block->tryMeregeWithAfterInMemory();
+        cur_block->is_free = false; // restore actuall is_free, might be redundent because already merged
+        new_block->is_free = false; // where the reacllocated mem now starts
     } else
     //if we should merege with the block after 'this' in memory: 
     if(cur_block->getAfterInMemory() != nullptr
