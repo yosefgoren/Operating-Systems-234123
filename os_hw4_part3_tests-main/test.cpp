@@ -287,13 +287,18 @@ std::string testWild(void *array[MAX_ALLOC]) {
 		DO_MALLOC(array[i] = smalloc(default_block_size));
 	}
 	checkStats(0, 0, __LINE__);
+	std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
 	sfree(array[MAX_ALLOC - 10]);
+	std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added	
 	checkStats(0, 0, __LINE__);
 	DO_MALLOC(array[MAX_ALLOC - 10] = smalloc(default_block_size * 3));
+	std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
 	checkStats(0, 0, __LINE__);
 	DO_MALLOC(array[MAX_ALLOC - 9] = smalloc(default_block_size));
+	std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
 	checkStats(0, 0, __LINE__);
 	DO_MALLOC(array[MAX_ALLOC - 9] = srealloc(array[MAX_ALLOC - 9], default_block_size * 2));
+	std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
 	checkStats(0, 0, __LINE__);
 
 	printMemory<Metadata3>(memory_start_addr, true);
@@ -711,8 +716,9 @@ int main() {
 	#endif
 	for (int i = 0 ; i < NUM_FUNC-sub ; ++i) {
 		#ifdef FORK
-		if(i == 10){
-			i = 10*10/10;
+		if(i == 7){
+			i = i+1;
+			i= i-1;
 		}
 		pid_t pid = fork();
 		if (pid == 0) {

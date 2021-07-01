@@ -572,15 +572,14 @@ void* srealloc(void* oldp, size_t size){
         return oldp;
     }
 
+    cur_block->is_free = true;//for now, until memory will be copied. 
     //if we should merege with the block before 'this' in memory:
     if(cur_block->before_in_memory != nullptr
     && cur_block->before_in_memory->is_free
     && cur_block->before_in_memory->getTotalSize() + cur_block->getTotalSize() >= wanted_total_size){
         new_block = cur_block->before_in_memory;
-        cur_block->is_free = true; // actually false, but need to merge
         new_block->tryMeregeWithAfterInMemory();
         cur_block->is_free = false; // restore actuall is_free, might be redundent because already merged
-        new_block->is_free = false; // where the reacllocated mem now starts
     } else
     //if we should merege with the block after 'this' in memory: 
     if(cur_block->getAfterInMemory() != nullptr
@@ -600,10 +599,13 @@ void* srealloc(void* oldp, size_t size){
         new_block->tryMeregeWithNeighbors();
     } else {//we have to look for space in the regular way (first in bin table and sbrk/mmap otherwise):
         new_block = Block::getBlockFromAllocatedUdata(completeSearchAndAllocate(size));
-        if(new_block == nullptr)
+        if(new_block == nullptr){
+            new_block->is_free = false;
             return nullptr;
+        }
         sfree(oldp);
     }
+    new_block->is_free = false;        
 
     //at this point, we have found some block with the reqested size (new_block), the old block was removed if it was needed.
     //now we update the allocation data structure to handle the change, and copy the old user data:
