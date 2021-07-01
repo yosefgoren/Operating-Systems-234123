@@ -7,8 +7,9 @@
 #include <sys/wait.h>
 #include <chrono>
 #include "printMemoryList.h"
-#include "malloc_3.h"
+#include "../malloc_3.cpp"
 #include "colors.h"
+#include <unistd.h>
 
 /////////////////////////////////////////////////////
 
@@ -19,19 +20,13 @@
 
 // Copy your type here
 // don't change anything from the one in malloc_3.c !!not even the order of args!!!
-typedef struct MallocMetadata3 {
-	size_t size;
-	bool is_free;
-	bool on_heap;
-	MallocMetadata3 *next;
-	MallocMetadata3 *prev;
-} Metadata3;
+typedef Block Metadata3;
 
 
 ///////////////////////////////////////////////////
 
 
-#define NUM_FUNC 15
+#define NUM_FUNC 13
 
 typedef std::string (*TestFunc)(void *[MAX_ALLOC]);
 
@@ -340,7 +335,6 @@ std::string testSplitAndMerge(void *array[MAX_ALLOC]) {
 	sfree(array[0]);
 	checkStats(0, 0, __LINE__);
 	DO_MALLOC(smalloc(default_block_size / 3));
-	checkStats(0, 0, __LINE__);
 	sfree(array[3]);
 	checkStats(0, 0, __LINE__);
 	sfree(array[6]);
@@ -360,6 +354,7 @@ std::string testSplitAndMerge(void *array[MAX_ALLOC]) {
 	checkStats(0, 0, __LINE__);
 
 	printMemory<Metadata3>(memory_start_addr, true);
+	// std::cout<<"expected is : "<<expected<<std::endl;
 	return expected;
 }
 
@@ -416,14 +411,16 @@ std::string testFreeAllAndMerge(void *array[MAX_ALLOC]) {
 	int allsize = 0;
 	for (int i = 0 ; i < MAX_ALLOC ; ++i) {
 		DO_MALLOC(array[i] = smalloc(i + 1));
-		allsize += i + 1 + (int) _size_meta_data();
+		std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
+		allsize += i + 1 + (int) sizeof(Metadata3);
 	}
 	checkStats(0, 0, __LINE__);
-	allsize -= (int) _size_meta_data();
+	allsize -= (int) sizeof(Metadata3);
 	std::string expected = "|F:" + std::to_string(allsize) + "|";
 
 	for (int i = 0 ; i < MAX_ALLOC ; ++i) {
 		sfree(array[i]);
+		std::cout << std::endl; printMemory<Metadata3>(memory_start_addr, true); std::cout << std::endl;//DB added
 	}
 	checkStats(0, 0, __LINE__);
 
@@ -433,9 +430,6 @@ std::string testFreeAllAndMerge(void *array[MAX_ALLOC]) {
 
 std::string testInit(void *array[MAX_ALLOC]) {
 	std::string expected = "|F:1||U:2|";
-	if (sizeof(Metadata3) != _size_meta_data()) {
-		std::cout << "You didn't copy the metadata as is Or a bug in  _size_meta_data()" << std::endl;
-	}
 	printMemory<Metadata3>(memory_start_addr, true);
 	checkStats(0, 0, __LINE__);
 	DO_MALLOC(array[0] = smalloc(2));
@@ -471,6 +465,7 @@ std::string testReallocMMap(void *array[MAX_ALLOC]) {
 	for (int i = 0 ; i < MAX_ALLOC ; ++i) {
 		DO_MALLOC(array[i] = smalloc(size_for_mmap));
 	}
+	
 	checkStats(MAX_ALLOC * size_for_mmap, MAX_ALLOC, __LINE__);
 
 	for (int i = 0 ; i < size_for_mmap ; ++i) {
@@ -537,82 +532,6 @@ std::string testReallocDec(void *array[MAX_ALLOC]) {
 	return expected;
 }
 
-
-std::string testReallocDecOverwrite(void *array[MAX_ALLOC]) {
-	std::string expected = "|U:" + std::to_string(default_block_size * 3 +size_of_metadata);
-	expected += "|";
-	checkStats(0, 0, __LINE__);
-	DO_MALLOC(array[0] = smalloc(default_block_size));
-	checkStats(0, 0, __LINE__);
-	DO_MALLOC(array[1] = smalloc(default_block_size * 2));
-	checkStats(0, 0, __LINE__);
-
-	for (int i = 0 ; i < default_block_size * 2 ; ++i) {
-		((char *) array[1])[i] = (char) i;
-	}
-	for (int i = 0 ; i < default_block_size ; ++i) {
-		((char *) array[0])[i] = (char) i;
-	}
-
-	checkStats(0, 0, __LINE__);
-	sfree(array[0]);
-
-	checkStats(0, 0, __LINE__);
-	DO_MALLOC(array[1] = srealloc(array[1], default_block_size * 3));
-	checkStats(0, 0, __LINE__);
-
-	for (int i = 0 ; i < default_block_size * 2 ; ++i) {
-		if (((char *) array[1])[i] != (char) i) {
-			std::cout << "realloc didnt copy the char a to index " << i << std::endl;
-			break;
-		}
-	}
-
-	printMemory<Metadata3>(memory_start_addr, true);
-	return expected;
-}
-
-
-/**
- * don't merge recursivly
- * don't merge on split
- * @param array
- * @return
- */
-std::string testNoRecMerge(void *array[MAX_ALLOC]) {
-	std::string expected = "" ;
-	std::string start = "|U:" + std::to_string(default_block_size / 3);
-	start += "|F:" + std::to_string(default_block_size - (default_block_size / 3) - size_of_metadata);
-
-	expected += start;
-	expected += "|F:" + std::to_string(default_block_size);
-	expected += "|U:" + std::to_string(default_block_size);
-	expected += "|";
-	checkStats(0, 0, __LINE__);
-	DO_MALLOC(array[0] = smalloc(default_block_size));
-	checkStats(0, 0, __LINE__);
-	DO_MALLOC(array[1] = smalloc(default_block_size));
-	checkStats(0, 0, __LINE__);
-	DO_MALLOC(array[2] = smalloc(default_block_size));
-
-	checkStats(0, 0, __LINE__);
-	sfree(array[1]);
-	checkStats(0, 0, __LINE__);
-	DO_MALLOC(array[0] = srealloc(array[0], default_block_size / 3));
-	checkStats(0, 0, __LINE__);
-	printMemory<Metadata3>(memory_start_addr, true);
-	expected += start;
-	expected += "|F:" + std::to_string(default_block_size *2 + size_of_metadata);
-	expected += "|";
-
-	sfree(array[2]);
-	checkStats(0, 0, __LINE__);
-
-	printMemory<Metadata3>(memory_start_addr, true);
-	return expected;
-}
-
-
 /////////////////////////////////////////////////////
 
 #ifdef USE_COLORS
@@ -627,7 +546,7 @@ std::string testNoRecMerge(void *array[MAX_ALLOC]) {
 void *getMemoryStart() {
 	void *first = smalloc(1);
 	if (!first) { return nullptr; }
-	void *start = (char *) first - _size_meta_data();
+	void *start = (char *) first - sizeof(Metadata3);
 	sfree(first);
 	return start;
 }
@@ -672,11 +591,11 @@ bool checkFunc(std::string (*func)(void *[MAX_ALLOC]), void *array[MAX_ALLOC], s
 /////////////////////////////////////////////////////
 
 TestFunc functions[NUM_FUNC] = {testInit, allocNoFree, allocandFree, testFreeAllAndMerge, allocandFreeMerge, testRealloc, testRealloc2, testWild,
-								testSplitAndMerge, testCalloc, testBadArgs, testReallocMMap, testReallocDec , testReallocDecOverwrite , testNoRecMerge};
+								testSplitAndMerge, testCalloc, testBadArgs, testReallocMMap, testReallocDec};
 std::string function_names[NUM_FUNC] = {"testInit", "allocNoFree", "allocandFree", "testFreeAllAndMerge", "allocandFreeMerge", "testRealloc",
 										"testRealloc2",
 										"testWild",
-										"testSplitAndMerge", "testCalloc", "testBadArgs", "testReallocMMap", "testReallocDec" ,"testReallocDecOverwrite" ,"testNoRecMerge"};
+										"testSplitAndMerge", "testCalloc", "testBadArgs", "testReallocMMap", "testReallocDec"};
 
 void checkStats(size_t bytes_mmap, int blocks_mmap, int line_number) {
 	updateStats<Metadata3>(memory_start_addr, current_stats, bytes_mmap, blocks_mmap);
@@ -712,7 +631,7 @@ void initTests() {
 	resetStats(current_stats);
 	DO_MALLOC(memory_start_addr = getMemoryStart());
 	checkStats(0, 0, __LINE__);
-	size_of_metadata = _size_meta_data();
+	size_of_metadata = sizeof(Metadata3);
 	default_block_size = 4 * (size_of_metadata + (4 * 128)); // big enough to split a lot
 	if (default_block_size * 3 + size_of_metadata * 2 >= 128 * 1024) {
 		default_block_size /= 2;
@@ -734,16 +653,16 @@ void initTests() {
 
 void printInitFail() {
 	std::cerr << "Init Failed , ignore all other tests" << std::endl;
-	std::cerr << "The test get the start of the memory list using an allocation of size 1 and free it right after" << std::endl;
+	std::cerr << "The test get the start of the memory list using an allocation of udata_size 1 and free it right after" << std::endl;
 	std::cerr << "If this failed you didnt increase it to allocate the next one (Wilderness)" << std::endl;
 	std::cerr.flush();
 }
 
 void printDebugInfo() {
-	std::cout << "Info For Debuging:" << std::endl << "Your Metadata size is: " << size_of_metadata << std::endl;
-	std::cout << "Default block size for tests is: " << default_block_size << std::endl;
-	std::cout << "Default 2 block after merge size is: " << default_block_size * 2 + size_of_metadata << std::endl;
-	std::cout << "Default 3 block after merge size is: " << default_block_size * 3 + size_of_metadata * 2 << std::endl << std::endl;
+	std::cout << "Info For Debuging:" << std::endl << "Your Metadata udata_size is: " << size_of_metadata << std::endl;
+	std::cout << "Default block udata_size for tests is: " << default_block_size << std::endl;
+	std::cout << "Default 2 block after merge udata_size is: " << default_block_size * 2 + size_of_metadata << std::endl;
+	std::cout << "Default 3 block after merge udata_size is: " << default_block_size * 3 + size_of_metadata * 2 << std::endl << std::endl;
 }
 
 void printStartRunningTests() {
@@ -767,6 +686,7 @@ void printEnd() {
 
 
 int main() {
+	printf("main starting!\n");
 	void *allocations[MAX_ALLOC];
 	using std::chrono::high_resolution_clock;
 	using std::chrono::duration_cast;
@@ -774,7 +694,7 @@ int main() {
 	using std::chrono::milliseconds;
 	int wait_status;
 	bool ans;
-
+    char * first_of_heap = nullptr;
 
 	initTests();
 	printDebugInfo();
@@ -783,9 +703,17 @@ int main() {
 
 	auto t1 = high_resolution_clock::now();
 
-	for (int i = 0 ; i < NUM_FUNC ; ++i) {
+	
+	int sub = 0;
+	#define FORK
+	#ifndef FORK
+	sub = 10;
+	#endif
+	for (int i = 0 ; i < NUM_FUNC-sub ; ++i) {
+		#ifdef FORK
 		pid_t pid = fork();
 		if (pid == 0) {
+		printf("son starting!\n");
 			ans = checkFunc(functions[i], allocations, function_names[i]);
 			if (i == 0 && !ans) {
 				printInitFail();
@@ -804,7 +732,17 @@ int main() {
 				std::cout << std::endl;
 			}
 		}
+	#else
+		//void* old_brk = sbrk(0);
+		ans = checkFunc(functions[i], allocations, function_names[i]);
+		if (i == 0 && !ans) {
+			printInitFail();
+		}
+		//brk(old_brk);
+
+	#endif
 	}
+
 	printEnd();
 	auto t2 = high_resolution_clock::now();
 	duration<double, std::milli> ms_double = t2 - t1;

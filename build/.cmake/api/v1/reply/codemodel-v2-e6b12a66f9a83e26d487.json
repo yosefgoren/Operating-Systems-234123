@@ -42,7 +42,8 @@
 						25,
 						26,
 						27,
-						28
+						28,
+						29
 					]
 				}
 			],
@@ -85,7 +86,8 @@
 						25,
 						26,
 						27,
-						28
+						28,
+						29
 					]
 				}
 			],
@@ -289,9 +291,16 @@
 				},
 				{
 					"directoryIndex" : 0,
-					"id" : "malloc_3::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-malloc_3-Debug-5ce37a6442afc90be912.json",
-					"name" : "malloc_3",
+					"id" : "ariel::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ariel-Debug-14bb19953d92457dfa1b.json",
+					"name" : "ariel",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "test_3::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-test_3-Debug-e80438a3c1937dd98a21.json",
+					"name" : "test_3",
 					"projectIndex" : 0
 				}
 			]

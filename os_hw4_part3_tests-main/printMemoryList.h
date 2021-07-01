@@ -11,6 +11,7 @@
 //void printMemory4(void* start);
 
 #include <iostream>
+#include "unistd.h"
 
 typedef struct stats_t {
 	size_t num_free_blocks = 0;
@@ -29,15 +30,20 @@ void printMemory(void *start, bool onlyList) {
 	if (!onlyList) {
 		std::cout << "Printing Memory List\n";
 	}
-	while (current) {
-		if (current->is_free) {
-			std::cout << "|F:" << current->size;
+    T * program_break = (T*)sbrk(0);
+    while (current != program_break) {
+        if (current->is_free) {
+			std::cout << "|F:" << current->udata_size;
 		} else {
-			std::cout << "|U:" << current->size;
+			std::cout << "|U:" << current->udata_size;
 		}
-		size += current->size;
+		size += current->udata_size;
 		blocks++;
-		current = current->next;
+//		current = current->next;
+        size_t effective_size = current->udata_size;
+        char * temp_ptr = (char *)current;
+        temp_ptr += effective_size + sizeof (T);
+        current =  (T *)temp_ptr;
 	}
 	std::cout << "|";
 	if (!onlyList) {
@@ -59,15 +65,19 @@ template<class T>
 void updateStats(void *start, stats &current_stats, size_t bytes_mmap, int blocks_mmap) {
 	resetStats(current_stats);
 	T *current = (T *) start;
-	while (current) {
+	T * program_break = (T*)sbrk(0);
+	while (current != program_break) {
 		current_stats.num_meta_data_bytes += sizeof(T);
-		current_stats.num_allocated_bytes += current->size;
+		current_stats.num_allocated_bytes += current->udata_size;
 		current_stats.num_allocated_blocks++;
 		if (current->is_free) {
 			current_stats.num_free_blocks++;
-			current_stats.num_free_bytes += current->size;
+			current_stats.num_free_bytes += current->udata_size;
 		}
-		current = current->next;
+        size_t effective_size = current->udata_size;
+        char * temp_ptr = (char *)current;
+        temp_ptr += effective_size + sizeof (T);
+        current =  (T *)temp_ptr;//		current = current->next;
 	}
 	current_stats.num_meta_data_bytes += sizeof(T) * blocks_mmap;
 	current_stats.num_allocated_bytes += bytes_mmap;

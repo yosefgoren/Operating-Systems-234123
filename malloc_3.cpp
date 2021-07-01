@@ -58,6 +58,8 @@ public:
         if(getTotalSize() >= first_block_total_size + sizeof(Block) + min_udata_size_for_split){
             //find the position of the new block and initialize it's value:
             Block* new_block = (Block*)((size_t)this + sizeof(Block) + first_block_total_size);
+            //fix 'before_in_memory' field of the block after 'this':
+            getAfterInMemory()->before_in_memory = new_block;
             size_t new_block_udata_size = this->getTotalSize()-sizeof(Block)*2-first_block_total_size;
             *new_block = Block(true, nullptr, nullptr, new_block_udata_size, nullptr, this);
             //update the size of the existing block:
@@ -86,10 +88,13 @@ public:
         Block* after = getAfterInMemory();    
         if(after == nullptr || !after->is_free)
             return;
+         
         //otherwise, we have to merege them together:
         after->removeFromContainingBin();
-        after->is_free = true;
-        //this last line of code theoreticaly does nothing, but might protect the user if he frees the same block multiple times. 
+        
+        //if there is a block after 'this->after', fix it's 'before_in_memory' field:
+        if(after->getAfterInMemory() != nullptr)
+            after->getAfterInMemory()->before_in_memory = this;
 
         //this block 'takes on' the size of the block after it:
         udata_size += after->getTotalSize();
@@ -266,11 +271,7 @@ public:
         size_t bin_index = total_size/KB_bytes;
         if(bin_index > BIG_BOI_BIN_INDEX)
             bin_index = BIG_BOI_BIN_INDEX;
-        return bin_index;
-        // if(total_size/KB_bytes != (total_size-1)/KB_bytes)
-        //     simple_index = total_size/KB_bytes+1;
-        // else
-        //     simple_index = total_size/KB_bytes;   
+        return bin_index;  
     }
 
     /**
@@ -319,7 +320,7 @@ public:
 };
 
 Block* Block::getAfterInMemory() const{
-    if(containing_bin == nullptr || containing_bin->bin_index == BIG_BOI_BIN_INDEX)
+    if(containing_bin != nullptr && containing_bin->bin_index == BIG_BOI_BIN_INDEX)
         return nullptr;
     Block* possible_new_block = (Block*)((size_t)this+getTotalSize());
     if(possible_new_block == sbrk(0))
@@ -383,7 +384,7 @@ void Block::siftWithPrev(){
 void Block::removeFromContainingBin(){
     Bin* bin = this->containing_bin;
     if(bin == nullptr)
-        return;//a block with no bin thould have no blocks connected to it.
+        return;//a block with no bin should have no blocks connected to it.
     
     if(bin->biggest == this)
         bin->biggest = this->prev;
@@ -391,14 +392,13 @@ void Block::removeFromContainingBin(){
         bin->smallest = this->next;
     this->containing_bin = nullptr;
 
-    if(this->next != nullptr){
+    if(this->next != nullptr)
         this->next->prev = this->prev;
-        this->next = nullptr;
-    }
-    if(this->prev != nullptr){
+    if(this->prev != nullptr)
         this->prev->next = this->next;
-        this->prev = nullptr;
-    }
+
+    this->next = nullptr;
+    this->prev = nullptr;
 }
 
 void Block::correctPositionInBinTable(){
