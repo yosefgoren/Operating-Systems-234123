@@ -1,259 +1,144 @@
 #include <unistd.h>
-#include <cstring>
+#include <cstring>//for memcpy and memset
+#include <sys/mman.h>
 
-using namespace std;
+static const size_t MAX_BLOCK_SIZE = 100000000;
 
-static const size_t meta_data_size = sizeof(Block);
-struct Block{
-    
+struct Block {
+    size_t udata_size;
     bool is_free;
-    Block* next;
-    Block* prev;
-    
-    size_t getFullSize() const{
-        void* first_byte_outside_udata = (next == NULL
-            ? sbrk(0) : (void*)next);
-        return (size_t)first_byte_outside_udata - (size_t)this;
-    }
-    size_t getUdataSize() const{
-        return getFullSize() - meta_data_size;
-    }
-    void* getStartOfUdata() const{
-        return (void*)this + meta_data_size;
-    }
-    // void setFreeAndRemoveFromList(){
-    //     is_free = true;
-    //     if(next != NULL)
-    //         next->prev = prev;
-    //     if(prev != NULL)
-    //         prev->next = next;
-    //     next = prev = NULL;
-    // }
 
-    /**
-     * returns a pointer to the block s.t. 'udata_ptr' points to the udata of that block.
-     */
-    static Block* getBlockFromAllocatedUdata(void* udata_ptr){
-        return (Block*)((size_t)udata_ptr-meta_data_size);
+    size_t getTotalSize() const{
+        return sizeof(Block)+udata_size;
+    }
+
+    void* getUdataStart() const{
+        return (void*)((size_t)this+sizeof(Block));
+    }
+
+    Block* getBlockAfter() const{
+        Block* possible_new_block = (Block*)((size_t)this+getTotalSize());
+        if(possible_new_block == (Block*)sbrk(0))
+            return nullptr;
+        return possible_new_block;
     }
 };
 
-struct BlockList{
-    Block* first;
-    Block* last;
-};
-
-static BlockList block_list = {NULL, NULL};
-
-/**
- * iterates over the list and returns a pointer to a block with udata with size of atleast 'size'.
- * if one cannot be found, returns NULL.
- */
-static Block* findBlockOfSize(size_t size){
-    Block* cur_block = block_list.first;
-    while(cur_block != NULL){
-        if(cur_block->is_free && cur_block->getUdataSize() >= size)
-            return cur_block;
-    } 
-    return NULL;
+Block* blockFromUdata(void* udata){
+    if(udata == nullptr)
+        return nullptr;
+    return (Block*)((size_t)udata-sizeof(Block));
 }
 
-/**
- * tries to allocate new space for a block with udata of size 'size' by calling 'sbrk()',
- *      if fails, reuturns NULL, otherwise - initializes a new block in the allocated space,
- *      inserts it as the last item in the block list, and returns a pointer to it.
- */
-static Block* allocateNewBlock(size_t size){
-    Block* new_block = (Block*)sbrk(meta_data_size+size);
-    if(new_block == NULL)
-        return NULL;
+Block* first_block = nullptr;
 
-    new_block->is_free = false;
-    new_block->next = NULL;
-    new_block->prev = block_list.last;
-    
-    if(block_list.last != NULL)
-        block_list.last->next = new_block;
-    else
-        block_list.first = block_list.last = new_block;
+#define foreach(todo)\
+    Block* block_cur = first_block;\
+    while (block_cur != nullptr){\
+        todo;\
+        block_cur = block_cur->getBlockAfter();\
+    }\
 
-    return new_block;
+Block* firstFits(size_t tot_size){    
+    // foreach(
+    //     if(block_cur->is_free && block_cur->getTotalSize() >= tot_size){
+    //         block_cur->is_free = false;
+    //         return block_cur;
+    //     }
+    // )
+
+    Block* block_cur = first_block;
+    while (block_cur != nullptr){
+        if(block_cur->is_free && block_cur->getTotalSize() >= tot_size){
+            block_cur->is_free = false;
+            return block_cur;
+        }       
+        block_cur = block_cur->getBlockAfter();
+    }
+    return nullptr;
 }
 
-/**
- * changes the values of all bytes in memory to 0: starting with 'start_addr', 
- *      and ending with 'start_addr+num_bytes-1' (including the last one).
- */
-static void zeroOutBytes(void* start_addr, size_t num_bytes){
-    memset(start_addr, 0, num_bytes);
+Block* newBlock(size_t tot_size){
+    Block* res = (Block*)sbrk(tot_size);
+    if(res == nullptr)
+        return nullptr;
+    if(first_block == nullptr)
+        first_block = res;
+    res->is_free = false;
+    res->udata_size = tot_size-sizeof(Block);
+    return res;
 }
 
-/**
- * copies 'num_bytes' bytes from 'src' to 'dst'.
- */
-static void copyBytes(void* src, void* dst, size_t num_bytes){
-    memcpy(dst, src, num_bytes);
+bool illegalUSize(size_t usize){
+    return usize == 0 || usize > MAX_BLOCK_SIZE;
 }
 
-/*
-============ Interface: ==================================================================================================================================
-*/
-
-/**
- * @brief Searches for a free block up to 'size' bytes or allocates a new one if serach fails.
- * @return
- *      success - returns a pointer to the first byte in the allocated block (excluding meta-data).
- *      failure - returns NULL in the following cases: 'size' is 0 or more than 100000000, 'sbrk()' fails.
- */
 void* smalloc(size_t size){
-    if(size == NULL || size > 100000000)
-        return NULL;
-    
-    Block* res = findBlockOfSize(size);
-    if(res != NULL){
+    if(illegalUSize(size))
+        return nullptr;
+    size_t tot_size = size + sizeof(Block);
+    Block* res = firstFits(tot_size);
+    if(res != nullptr){
         res->is_free = false;
-        return res->getStartOfUdata();
+        return res;
     }
-    res = allocateNewBlock(size);
-    if(res == NULL)
-        return NULL;
-
-    return res->getStartOfUdata();
+    return newBlock(tot_size)->getUdataStart();
 }
 
-/**
- * @brief Searches for a free block of up to 'num' elements, each 'size' bytes that are all set to 0,
- *      or allocates if none are found. in other words, find/allocate size*num bytes and set all bytes to 0.
- * @return
- *      success - returns a pointer to the first byte in the allocated block (excluding meta-data).
- *      failure - returns NULL in the following cases: 'size' is 0 or more than 100000000, 'sbrk()' fails.
- */
 void* scalloc(size_t num, size_t size){
-    if(size == NULL || size > 100000000)
-        return NULL;   
-    Block* res = findBlockOfSize(num*size);
-    if(res != NULL){
-        zeroOutBytes(res->getStartOfUdata(), num*size);
-        res->is_free = false;
-        return res->getStartOfUdata();
+    size_t usize = num*size;
+    if(illegalUSize(usize))
+        return nullptr;
+    void* res = smalloc(usize);
+    if(res != nullptr){
+        memset(res, 0, usize);
     }
-
-    res = allocateNewBlock(num*size);
-    if(res == NULL)
-        return NULL;
-    
-    zeroOutBytes(res->getStartOfUdata(), num*size);
-    return res->getStartOfUdata();
+    return res;
 }
 
-/**
- * @brief Releases the usage of the block that starts with the pointer 'p'.
- *      if 'p' is NULL or already released, do nothing.
- * assumes 'p' truely points to the start or an allocated block.
- */
 void sfree(void* p){
-    if(p == NULL)
+    if(p == nullptr)
         return;
-    Block::getBlockFromAllocatedUdata(p)->is_free = true;
+    blockFromUdata(p)->is_free = true;
 }
 
-/**
- * @brief if ‘size’ is smaller than the current block’s size, reuses the same block. Otherwise,
- *      finds/allocates ‘size’ bytes for a new space, copies content of oldp into the new
- *      allocated space and frees the oldp.
- * 'oldp' is not freed if srealloc fails.
- * if 'oldp' is NULL, allocates space for 'size' bytes and return pointer. 
- * @return 
- *      success - returns a pointer to the first byte in the allocated block (excluding meta-data).
- *      failure - returns NULL in the following cases: 'size' is 0 or more than 100000000, 'sbrk()' fails.
- * does not free 'oldp' is srealloc fails.
- */
 void* srealloc(void* oldp, size_t size){
-    if(size == 0 || size > 100000000)
-        return NULL;
-    if(oldp == NULL)
-        return smalloc;
+    if(illegalUSize(size))
+        return nullptr;
+    if(oldp == nullptr)
+        return nullptr;
+    Block* block = blockFromUdata(oldp);
+    if(block->udata_size >= size)
+        return nullptr;
+    void* res = smalloc(size);
+    if(res == nullptr)
+        return nullptr;
+    blockFromUdata(res)->is_free = false;
+    memcpy(res, oldp, size < block->udata_size ? size : block->udata_size);
+    block->is_free = true;
+    return res;
+}
 
-    Block* old_block = Block::getBlockFromAllocatedUdata(oldp);
-    size_t old_size = old_block->getUdataSize();
-    if(old_size >= size)
-        return oldp;
+#define sumup(toadd)\
+    size_t sum = 0;\
+    foreach(sum += toadd);\
+    return sum;
 
-    Block* new_block = findBlockOfSize(size);
-    if(new_block == NULL){
-        new_block = allocateNewBlock(size);
-        if(new_block == NULL)
-            return NULL;
-    }
-
-    copyBytes(oldp, new_block->getStartOfUdata(), old_size);
-    sfree(oldp);
-    return new_block->getStartOfUdata();
-}   
-
-
-/**
- * Returns the number of allocated blocks in the heap that are currently free.
- */
 size_t _num_free_blocks(){
-    int counter = 0;
-    Block* cur_block = block_list.first;
-    while(cur_block != NULL){
-        counter += cur_block->is_free;
-        cur_block = cur_block->next;
-    }
-    return counter;
+    sumup(block_cur->is_free);
 }
-/**
- * Returns the number of bytes in all allocated blocks in the heap that are currently free,
- * excluding the bytes used by the meta-data structs.
- */
 size_t _num_free_bytes(){
-    size_t size_free = 0;
-    Block* cur_block = block_list.first;
-    while(cur_block != NULL){
-        if(cur_block->is_free)
-            size_free += cur_block->getUdataSize();
-        cur_block = cur_block->next;
-    }
-    return size_free;
+    sumup(block_cur->is_free*block_cur->udata_size);
 }
-/**
- * Returns the overall (free and used) number of allocated blocks in the heap.
- */
 size_t _num_allocated_blocks(){
-    int counter = 0;
-    Block* cur_block = block_list.first;
-    while(cur_block != NULL){
-        counter += 1;
-        cur_block = cur_block->next;
-    }
-    return counter;
+    sumup(1);
 }
-/**
- * Returns the overall number (free and used) of allocated bytes in the heap, excluding
- * the bytes used by the meta-data structs.
- */
 size_t _num_allocated_bytes(){
-    size_t size_free = 0;
-    Block* cur_block = block_list.first;
-    while(cur_block != NULL){
-        size_free += cur_block->getUdataSize();
-        cur_block = cur_block->next;
-    }
-    return size_free;
+    sumup(block_cur->udata_size);
 }
-/**
- * Returns the overall number of meta-data bytes currently in the heap.
- */
 size_t _num_meta_data_bytes(){
-    return _num_allocated_blocks()*meta_data_size;
+    sumup(sizeof(Block));
 }
-/**
- * Returns the number of bytes of a single meta-data structure in your system.
- */
 size_t _size_meta_data(){
-    return meta_data_size;
+    return sizeof(Block);
 }
-
-
