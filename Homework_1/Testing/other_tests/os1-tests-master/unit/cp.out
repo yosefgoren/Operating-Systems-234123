@@ -1,0 +1,123 @@
+smash> my_sleep
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+smash> smash> my_sleep
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> my_sleep
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> smash> smash> my_sleep
+new_random1.txt
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> smash> smash> my_sleep
+new_random1.txt
+new_random2.txt
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> smash> smash> my_sleep
+new_random1.txt
+new_random2.txt
+new_temp_file
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> smash> my_sleep
+new_random1.txt
+new_random2.txt
+new_temp_file
+new_temp_file2
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> smash> my_sleep
+new_random1.txt
+new_random2.txt
+new_temp_file
+new_temp_file2
+new_temp_file3
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> smash: got ctrl-C
+smash: process 10367 was killed
+smash> smash> smash: got ctrl-Z
+smash: process 10370 was stopped
+smash> 1 cp /dev/zero /dev/null : 10370 2 (stopped)
+smash> smash> 1 cp /dev/zero /dev/null : 10370 3
+smash> smash> 1 cp /dev/zero /dev/null : 10370 4
+smash> smash: got ctrl-C
+smash: process 10379 was killed
+smash> smash> smash error: waitpid failed: No child processes
+smash> smash: got ctrl-C
+smash: process 10386 was killed
+smash> smash error: waitpid failed: No child processes
+smash> smash> empty_file
+my_sleep
+new_random1.txt
+new_random2.txt
+new_temp_file
+new_temp_file2
+new_temp_file3
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> smash> empty_file
+my_sleep
+new_empty_file
+new_random1.txt
+new_random2.txt
+new_temp_file
+new_temp_file2
+new_temp_file3
+random1.txt
+random2.txt
+sub1
+sub2
+sub3
+temp_file
+smash> smash> smash> smash> smash error: waitpid failed: No child processes
+smash> cp: cannot create regular file '/not/exisits/dir/bla': No such file or directory
+smash> cp: cannot stat '/not/exisits/dir/bla': No such file or directory
+smash> smash> cp: 'random1.txt' and 'random1.txt' are the same file
+smash> smash> cp: '/tmp/smash_test/random1.txt' and 'random1.txt' are the same file
+smash> smash> cp: 'random1.txt' and '/tmp/smash_test/random1.txt' are the same file
+smash> smash> cp: '/tmp/smash_test/random1.txt' and '/tmp/smash_test/random1.txt' are the same file
+smash> smash> cp: cannot stat 'doesnt_exist.txt': No such file or directory
+smash> subsub1
+smash> smash> random1.txt
+subsub1
+smash> smash> smash error: waitpid failed: No child processes
+smash> 

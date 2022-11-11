@@ -1,0 +1,120 @@
+Setting up test:
+	thread: 3
+	queue size: 7
+	policy: dh
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_drop_double_queue_size. num req: 21 ==========================
+Requests succeeded: 7
+Requests failed: 14
+Setting up test:
+	thread: 3
+	queue size: 7
+	policy: dh
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_drop_single. num req: 8 ==========================
+Requests succeeded: 7
+Requests failed: 1
+Setting up test:
+	thread: 3
+	queue size: 16
+	policy: random
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_double_drop_random. num req: 24 ==========================
+Requests succeeded: 0
+Requests failed: 24
+Setting up test:
+	thread: 3
+	queue size: 16
+	policy: random
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_no_drop. num req: 16 ==========================
+Requests succeeded: 16
+Requests failed: 0
+Setting up test:
+	thread: 3
+	queue size: 16
+	policy: random
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_single_drop_random. num req: 17 ==========================
+Requests succeeded: 0
+Requests failed: 17
+Setting up test:
+	thread: 3
+	queue size: 7
+	policy: dt
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_drop_double_queue_size. num req: 21 ==========================
+Requests succeeded: 7
+Requests failed: 14
+Setting up test:
+	thread: 3
+	queue size: 7
+	policy: dt
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_drop_single. num req: 8 ==========================
+Requests succeeded: 7
+Requests failed: 1
+Setting up test:
+	thread: 3
+	queue size: 80
+	policy: dt
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_better_with_more_threads. num req: 80 ==========================
+Requests succeeded: 80
+Requests failed: 0
+Setting up test:
+	thread: 9
+	queue size: 80
+	policy: dt
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_better_with_more_threads. num req: 80 ==========================
+Requests succeeded: 80
+Requests failed: 0
+Setting up test:
+	thread: 3
+	queue size: 80
+	policy: dt
+
+
+Requesting url: http://localhost:8080/output.cgi
+=================== caller is: test_time_full_queue. num req: 80 ==========================
+Requests succeeded: 80
+Requests failed: 0
+Setting up test:
+	thread: 1
+	queue size: 1
+	policy: dt
+Setting up test:
+	thread: 1
+	queue size: 1
+	policy: dt
+Setting up test:
+	thread: 1
+	queue size: 1
+	policy: dt
+Setting up test:
+	thread: 1
+	queue size: 1
+	policy: dt
+Setting up test:
+	thread: 1
+	queue size: 1
+	policy: dt

@@ -1,0 +1,1 @@
+python3 Testing/other_tests/os1-tests-master/test.py -smash="smash" -test="Testing/other_tests/os1-tests-master/unit/$1" > test_details.txt
